@@ -1,11 +1,20 @@
 "use client";
 
-import { del, get, set } from "idb-keyval";
+import { del, get, keys, set } from "idb-keyval";
 import { useEffect, useState } from "react";
 
 // Photos are stored in IndexedDB: localStorage is too small for images.
-const key = (poseId: string) => `pose-img:${poseId}`;
+const PREFIX = "pose-img:";
+const key = (poseId: string) => `${PREFIX}${poseId}`;
 const listeners = new Set<(poseId: string) => void>();
+const notify = (poseId: string) => listeners.forEach((l) => l(poseId));
+
+/** Receives the teacher's own photo changes (null = removed) so the cloud sync can upload them. */
+type ImageSink = (poseId: string, blob: Blob | null) => void;
+let sink: ImageSink | null = null;
+export function setImageSink(next: ImageSink | null) {
+  sink = next;
+}
 
 const MAX_SIDE = 900;
 
@@ -24,13 +33,38 @@ async function shrink(file: File): Promise<Blob> {
 }
 
 export async function savePoseImage(poseId: string, file: File) {
-  await set(key(poseId), await shrink(file));
-  listeners.forEach((l) => l(poseId));
+  const blob = await shrink(file);
+  await set(key(poseId), blob);
+  notify(poseId);
+  sink?.(poseId, blob);
 }
 
 export async function deletePoseImage(poseId: string) {
   await del(key(poseId));
-  listeners.forEach((l) => l(poseId));
+  notify(poseId);
+  sink?.(poseId, null);
+}
+
+/** Stores a photo received from the cloud (null = removed) without sending it back. */
+export async function storeSyncedImage(poseId: string, blob: Blob | null) {
+  if (blob) await set(key(poseId), blob);
+  else await del(key(poseId));
+  notify(poseId);
+}
+
+export const readPoseImage = (poseId: string) => get<Blob>(key(poseId));
+
+export async function listPoseImageIds(): Promise<string[]> {
+  return (await keys())
+    .filter((k): k is string => typeof k === "string" && k.startsWith(PREFIX))
+    .map((k) => k.slice(PREFIX.length));
+}
+
+/** Removes every photo from this device (used on sign-out; the cloud copy is kept). */
+export async function clearPoseImages() {
+  const ids = await listPoseImageIds();
+  await Promise.all(ids.map((id) => del(key(id))));
+  ids.forEach(notify);
 }
 
 export function usePoseImage(poseId: string): string | null {

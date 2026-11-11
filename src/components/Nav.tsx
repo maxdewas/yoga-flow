@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { AccountButton } from "./AccountButton";
 import { NavLinks } from "./NavLinks";
 import { NAV_LINKS } from "./nav-config";
 
@@ -24,6 +25,9 @@ export function Nav() {
           >
             <NavLinks />
           </Suspense>
+        </div>
+        <div className="sm:ml-auto">
+          <AccountButton />
         </div>
       </nav>
     </header>
