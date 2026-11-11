@@ -11,7 +11,10 @@ src/lib/catalog/imported/index.ts ; les noms traduits vivent dans names.json (id
 Règles :
 - une ligne dont le nom anglais (ou, pour une posture de base, le sanskrit) correspond à une
   posture du catalogue existant n'est pas dupliquée : ses faits enrichissent la posture existante ;
-- chaque posture pointe vers sa posture de base (« Famille » du fichier) via `vo` ;
+- les lignes qui ne sont pas des postures (repères de séquence, images d'accessoires) sont écartées ;
+- une posture est une variante (`vo`) seulement si son nom contient le nom complet d'une autre
+  posture (« Boat Pose Variation 1 » → « Boat Pose ») ; la colonne « Famille » du fichier regroupe
+  trop largement pour servir de lien de variante ;
 - les ids sont dérivés du nom anglais et stables d'un import à l'autre.
 Nécessite openpyxl (pip install openpyxl).
 """
@@ -99,7 +102,11 @@ KOSHA = {k + " Kosha": k.lower() for k in ["Annamaya", "Pranamaya", "Manomaya", 
 STILLNESS_TAGS = {"Mudras", "Pranayama", "Méditative", "Kriya", "Shat Kriya"}
 
 wb = openpyxl.load_workbook(sys.argv[1], read_only=True)
-rows = [r for r in wb["Catalogue"].iter_rows(min_row=2, values_only=True) if r[1]]
+# Families of the file that hold no poses: class-diagram markers ("Section Line", "Repeat 3"…)
+# and pictures of props ("Prop Strap"…).
+NOT_POSES = {"Repeat Other Side", "Prop Block"}
+all_rows = [r for r in wb["Catalogue"].iter_rows(min_row=2, values_only=True) if r[1]]
+rows = [r for r in all_rows if r[3] not in NOT_POSES]
 unknown = Counter()
 
 
@@ -161,6 +168,44 @@ family_base = {}
 for fam, idx in family_rows.items():
     named = [i for i in idx if rows[i][1] == fam]
     family_base[fam] = row_id[named[0]] if named else row_id[max(idx, key=lambda i: rows[i][11] or 0)]
+
+
+def words(name):
+    return tuple(re.sub(r"[^a-z0-9]+", " ", name.lower()).split())
+
+
+# Variation links from names: a row is a variation of the longest other pose name (at least two
+# words, "pose" included, so a prop word like "Chair" alone never becomes a base) found as a
+# contiguous run of words in its own name. Chains are followed up to the first standalone pose.
+by_words = {}
+for i, r in enumerate(rows):
+    w = words(r[1])
+    if len(w) >= 2:
+        by_words.setdefault(w, i)
+
+
+def direct_base(i):
+    w = words(rows[i][1])
+    for size in range(len(w) - 1, 1, -1):
+        for start in range(len(w) - size + 1):
+            j = by_words.get(w[start:start + size])
+            if j is not None and words(rows[j][1]) != w:
+                return j
+    return None
+
+
+# Poses recognised as poses in their own right (hand-written catalogue, base pose of a family in
+# the file) are never variations: "Side Plank Pose" stays a pose, not a variation of Plank.
+standalone = {i for i in range(len(rows)) if i in mapped_existing or rows[i][1] == rows[i][3]}
+parent = {i: None if i in standalone else direct_base(i) for i in range(len(rows))}
+
+
+def root(i):
+    seen = set()
+    while parent.get(i) is not None and i not in seen:
+        seen.add(i)
+        i = parent[i]
+    return i
 
 
 def transitions(v):
@@ -232,9 +277,9 @@ for i, r in enumerate(rows):
         "aft": transitions(r[25]),
     }
     d["shape"] = ["flexion-laterale"] if r[8] == "Flexion latérale" or "Flexion latérale" in split(r[9]) else []
-    base = family_base[r[3]]
-    if base != row_id[i]:
-        d["vo"] = base
+    base = root(i)
+    if base != i and row_id[base] != row_id[i]:
+        d["vo"] = row_id[base]
     facts[i] = d
 
 # Fill gaps from the family (level, sidedness, family, categories), then hard defaults.
@@ -331,8 +376,10 @@ os.makedirs(os.path.join(ROOT, ".cache"), exist_ok=True)
 with open(os.path.join(ROOT, ".cache/family-bases.json"), "w", encoding="utf-8") as fh:
     json.dump(family_base, fh, ensure_ascii=False, indent=1)
 
-print(f"{len(rows)} lignes → {len(poses)} nouvelles postures, {len(enrich)} postures existantes enrichies")
+print(f"{len(all_rows)} lignes, {len(all_rows) - len(rows)} non-postures écartées")
+print(f"{len(rows)} postures → {len(poses)} nouvelles, {len(enrich)} postures existantes enrichies")
 print("familles :", dict(Counter(facts[i]["fam"] for i in facts if i not in mapped_existing)))
-print("variantes :", sum(1 for i in facts if "vo" in facts[i]), "· bases :", len(set(family_base.values())))
+vo = Counter(facts[i]["vo"] for i in facts if "vo" in facts[i])
+print("variantes :", sum(vo.values()), "· postures avec variantes :", len(vo), "· plus grosses :", vo.most_common(6))
 if unknown:
     print("valeurs non codées :", dict(unknown))
