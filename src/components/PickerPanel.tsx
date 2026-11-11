@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Plus, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { formatDuration, itemSeconds } from "@/lib/duration";
 import { BUILTIN_SEQUENCES, SEQUENCE_ROLES } from "@/lib/sequences";
 import { usePoseMap, useStore } from "@/lib/store";
@@ -18,9 +18,20 @@ interface Props {
   suggestFor: string | null;
   onRefreshSuggestions: () => void;
   onClose: () => void;
+  /** Shown under the list, e.g. the class being built when the picker covers the editor. */
+  footer?: ReactNode;
 }
 
-export function PickerPanel({ counts, onPick, onAddItems, suggestions, suggestFor, onRefreshSuggestions, onClose }: Props) {
+export function PickerPanel({
+  counts,
+  onPick,
+  onAddItems,
+  suggestions,
+  suggestFor,
+  onRefreshSuggestions,
+  onClose,
+  footer,
+}: Props) {
   const [tab, setTab] = useState<"postures" | "enchainements">("postures");
   return (
     <div className="flex h-full flex-col">
@@ -77,6 +88,7 @@ export function PickerPanel({ counts, onPick, onAddItems, suggestions, suggestFo
           <SequenceList onAddItems={onAddItems} />
         )}
       </div>
+      {footer}
     </div>
   );
 }

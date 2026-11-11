@@ -19,15 +19,24 @@ export function useToast() {
   return { toast, show, hide: () => setToast(null) };
 }
 
-export function Toast({ toast, onHide, raised }: { toast: ToastData | null; onHide: () => void; raised?: boolean }) {
+/** `raised`: above a bottom bar (bulk actions); `high`: above the taller flow strip of the full-screen picker. */
+const OFFSETS = { none: "bottom-6", raised: "bottom-24", high: "bottom-36 sm:bottom-52" };
+
+export function Toast({
+  toast,
+  onHide,
+  offset = "none",
+}: {
+  toast: ToastData | null;
+  onHide: () => void;
+  offset?: keyof typeof OFFSETS;
+}) {
   if (!toast) return null;
   return (
     <div
       key={toast.id}
       role="status"
-      className={`fixed left-1/2 z-[60] flex -translate-x-1/2 animate-rise items-center gap-3 rounded-full bg-foreground py-2 pr-2 pl-4 text-sm text-background shadow-lift ${
-        raised ? "bottom-24" : "bottom-6"
-      }`}
+      className={`fixed left-1/2 z-[60] flex -translate-x-1/2 animate-rise items-center gap-3 rounded-full bg-foreground py-2 pr-2 pl-4 text-sm text-background shadow-lift ${OFFSETS[offset]}`}
     >
       <span className="h-1.5 w-1.5 rounded-full bg-accent-soft" />
       <span className="max-w-[60vw] truncate">{toast.text}</span>

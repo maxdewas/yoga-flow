@@ -44,6 +44,7 @@ import { AnalyticsPanel } from "@/components/AnalyticsPanel";
 import { BulkBar } from "@/components/BulkBar";
 import { FlowCard, FlowRow } from "@/components/FlowCard";
 import { ItemEditor } from "@/components/ItemEditor";
+import { FlowStrip } from "@/components/FlowStrip";
 import { PickerPanel } from "@/components/PickerPanel";
 import { DURATIONS, GeneratorDialog, Modal, TemplatesDialog } from "@/components/StartPanels";
 import { MenuItem, Popover } from "@/components/ui/Popover";
@@ -353,7 +354,8 @@ function Builder({ plan }: { plan: ClassPlan }) {
     if (window.matchMedia("(min-width: 1024px)").matches) setPrefs({ panel: prefs.panel === p ? null : p });
     else setMobilePanel(mobilePanel === p ? null : p);
   };
-  const panelFor = (p: Panel, close: () => void) =>
+  /** `fullScreen`: the panel covers the editor (below lg), so the picker shows the class being built. */
+  const panelFor = (p: Panel, close: () => void, fullScreen = false) =>
     p === "postures" ? (
       <PickerPanel
         counts={counts}
@@ -363,6 +365,11 @@ function Builder({ plan }: { plan: ClassPlan }) {
         suggestFor={lastPose?.nameFr ?? null}
         onRefreshSuggestions={() => setSuggestSeed((n) => n + 1)}
         onClose={close}
+        footer={
+          fullScreen && (
+            <FlowStrip sections={sections} targetId={activeId} poseMap={poseMap} totalSeconds={total} onDone={close} />
+          )
+        }
       />
     ) : (
       <AnalyticsPanel
@@ -798,7 +805,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
 
       {/* Panneau plein écran (mobile) */}
       {mobilePanel && (
-        <div className="fixed inset-0 z-50 flex animate-rise flex-col bg-background lg:hidden">{panelFor(mobilePanel, () => setMobilePanel(null))}</div>
+        <div className="fixed inset-0 z-50 flex animate-rise flex-col bg-background lg:hidden">{panelFor(mobilePanel, () => setMobilePanel(null), true)}</div>
       )}
 
       {/* Bouton d'ajout flottant (mobile, ou panneau fermé) */}
@@ -828,7 +835,12 @@ function Builder({ plan }: { plan: ClassPlan }) {
         />
       )}
 
-      <Toast toast={toast} onHide={hide} raised={selected.size > 0} />
+      {/* Raised above the bulk bar, or above the flow strip of the full-screen picker. */}
+      <Toast
+        toast={toast}
+        onHide={hide}
+        offset={mobilePanel === "postures" ? "high" : selected.size > 0 ? "raised" : "none"}
+      />
 
       {dialog === "generate" && (
         <GeneratorDialog
