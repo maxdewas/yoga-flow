@@ -6,18 +6,31 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "figures": "esbuild scripts/figure-sheet.tsx --bundle --platform=node --format=esm --packages=external --jsx=automatic --alias:@=./src --outfile=.cache/figure-sheet.mjs --log-level=warning && node .cache/figure-sheet.mjs",
+    "check:catalog": "esbuild scripts/check-catalog.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=.cache/check-catalog.mjs --log-level=warning && node .cache/check-catalog.mjs",
+    "export:poses": "esbuild scripts/export-poses.ts --bundle --platform=node --format=esm --packages=external --alias:@=./src --outfile=.cache/export-poses.mjs --log-level=warning && node .cache/export-poses.mjs",
+    "images": "node scripts/sync-pose-images.mjs",
+    "predev": "node scripts/sync-pose-images.mjs",
+    "prebuild": "node scripts/sync-pose-images.mjs"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "idb-keyval": "^6.3.0",
+    "lucide-react": "^1.72.0",
     "next": "16.4.5",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "zustand": "^5.1.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
