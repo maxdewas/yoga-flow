@@ -20,6 +20,9 @@ export type Category =
 
 export interface Pose {
   id: string;
+  /** Display name in the active language (catalogue translation, or the teacher's own name). */
+  name: string;
+  /** French name: source of the hand-written catalogue and the field the teacher edits. */
   nameFr: string;
   sanskrit: string;
   nameEn: string;
@@ -40,6 +43,12 @@ export interface Pose {
   figure?: FigureDef;
   /** Created by the user rather than shipped with the app. */
   custom?: boolean;
+  /** Imported from Éléonore's catalogue (structured facts, generated texts). */
+  imported?: boolean;
+  /** Base pose this one is a variation of (catalogue id). */
+  variantOf?: string;
+  /** Catalogue variations of this pose (ids), derived from `variantOf`. */
+  variants?: string[];
 }
 
 export type Side = "aucun" | "droite" | "gauche" | "les-deux";
@@ -74,15 +83,6 @@ export interface Section {
 
 export type ClassStyle = "vinyasa" | "hatha" | "yin" | "doux" | "restauratif" | "power";
 
-export const STYLE_LABELS: Record<ClassStyle, string> = {
-  vinyasa: "Vinyasa",
-  hatha: "Hatha",
-  yin: "Yin",
-  doux: "Yoga doux",
-  restauratif: "Restauratif",
-  power: "Power yoga",
-};
-
 export interface ClassPlan {
   id: string;
   title: string;
@@ -98,45 +98,3 @@ export interface ClassPlan {
   updatedAt: string;
 }
 
-export const LEVEL_LABELS: Record<Level, string> = {
-  debutant: "Débutant",
-  intermediaire: "Intermédiaire",
-  avance: "Avancé",
-};
-
-export const CATEGORY_LABELS: Record<Category, string> = {
-  debout: "Debout",
-  "a-genoux": "À genoux",
-  assise: "Assise",
-  allongee: "Allongée",
-  equilibre: "Équilibre",
-  "flexion-avant": "Flexion avant",
-  "flexion-arriere": "Flexion arrière",
-  torsion: "Torsion",
-  inversion: "Inversion",
-  "ouverture-hanches": "Ouverture des hanches",
-  gainage: "Gainage",
-  "equilibre-bras": "Équilibre sur les bras",
-  restauratrice: "Restauratrice",
-};
-
-export const SIDE_LABELS: Record<Side, string> = {
-  aucun: "Sans côté",
-  droite: "Côté droit",
-  gauche: "Côté gauche",
-  "les-deux": "Les deux côtés",
-};
-
-export const SIDE_SHORT: Record<Side, string> = {
-  aucun: "Face",
-  droite: "Droite",
-  gauche: "Gauche",
-  "les-deux": "D + G",
-};
-
-export const BREATH_LABELS: Record<Breath, string> = {
-  aucun: "Sans repère",
-  inspire: "Inspire",
-  expire: "Expire",
-  respire: "Respire ici",
-};

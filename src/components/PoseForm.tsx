@@ -1,9 +1,46 @@
 "use client";
 
 import { useState } from "react";
-import { CATEGORY_LABELS, LEVEL_LABELS, type Category, type Level, type Pose } from "@/lib/types";
+import { useLabels, useMessages } from "@/lib/i18n";
+import type { Category, Level, Pose } from "@/lib/types";
 
-export type PoseDraft = Omit<Pose, "id" | "custom">;
+const M = {
+  fr: {
+    name: "Nom *",
+    sanskrit: "Nom sanskrit",
+    english: "Nom anglais",
+    level: "Niveau",
+    sided: "Se pratique des deux côtés",
+    categories: "Catégories",
+    description: "Description / placement",
+    benefits: "Bienfaits (un par ligne)",
+    contra: "Contre-indications (une par ligne)",
+  },
+  en: {
+    name: "Name *",
+    sanskrit: "Sanskrit name",
+    english: "English name",
+    level: "Level",
+    sided: "Practiced on both sides",
+    categories: "Categories",
+    description: "Description / alignment",
+    benefits: "Benefits (one per line)",
+    contra: "Contraindications (one per line)",
+  },
+  es: {
+    name: "Nombre *",
+    sanskrit: "Nombre en sánscrito",
+    english: "Nombre en inglés",
+    level: "Nivel",
+    sided: "Se practica en ambos lados",
+    categories: "Categorías",
+    description: "Descripción / alineación",
+    benefits: "Beneficios (uno por línea)",
+    contra: "Contraindicaciones (una por línea)",
+  },
+};
+
+export type PoseDraft = Omit<Pose, "id" | "custom" | "name">;
 
 const lines = (s: string) =>
   s
@@ -20,6 +57,8 @@ export function PoseForm({
   submitLabel: string;
   onSubmit: (draft: PoseDraft) => void;
 }) {
+  const t = useMessages(M);
+  const L = useLabels();
   const [nameFr, setNameFr] = useState(initial?.nameFr ?? "");
   const [sanskrit, setSanskrit] = useState(initial?.sanskrit ?? "");
   const [nameEn, setNameEn] = useState(initial?.nameEn ?? "");
@@ -53,55 +92,55 @@ export function PoseForm({
     >
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="text-sm">
-          Nom français *
+          {t.name}
           <input className="input mt-1" required value={nameFr} onChange={(e) => setNameFr(e.target.value)} />
         </label>
         <label className="text-sm">
-          Nom sanskrit
+          {t.sanskrit}
           <input className="input mt-1" value={sanskrit} onChange={(e) => setSanskrit(e.target.value)} />
         </label>
         <label className="text-sm">
-          Nom anglais
+          {t.english}
           <input className="input mt-1" value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <label>
-          Niveau{" "}
+          {t.level}{" "}
           <select className="input mt-1 w-auto" value={level} onChange={(e) => setLevel(e.target.value as Level)}>
-            {(Object.keys(LEVEL_LABELS) as Level[]).map((l) => (
+            {(Object.keys(L.level) as Level[]).map((l) => (
               <option key={l} value={l}>
-                {LEVEL_LABELS[l]}
+                {L.level[l]}
               </option>
             ))}
           </select>
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={sided} onChange={(e) => setSided(e.target.checked)} />
-          Se pratique des deux côtés
+          {t.sided}
         </label>
       </div>
       <div>
-        <p className="mb-1 text-sm">Catégories</p>
+        <p className="mb-1 text-sm">{t.categories}</p>
         <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
+          {(Object.keys(L.category) as Category[]).map((c) => (
             <button type="button" key={c} className="chip" data-active={categories.includes(c)} onClick={() => toggle(c)}>
-              {CATEGORY_LABELS[c]}
+              {L.category[c]}
             </button>
           ))}
         </div>
       </div>
       <label className="block text-sm">
-        Description / placement
+        {t.description}
         <textarea className="input mt-1" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
-          Bienfaits (un par ligne)
+          {t.benefits}
           <textarea className="input mt-1" rows={4} value={benefits} onChange={(e) => setBenefits(e.target.value)} />
         </label>
         <label className="text-sm">
-          Contre-indications (une par ligne)
+          {t.contra}
           <textarea className="input mt-1" rows={4} value={contra} onChange={(e) => setContra(e.target.value)} />
         </label>
       </div>

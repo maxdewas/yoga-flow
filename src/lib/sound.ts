@@ -1,5 +1,7 @@
 "use client";
 
+import type { Locale } from "./locale";
+
 /** Sons du lecteur, synthétisés à la volée (aucun fichier audio à charger). */
 
 let ctx: AudioContext | null = null;
@@ -62,15 +64,25 @@ export function unlockAudio() {
   if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.getVoices();
 }
 
-export function speak(text: string) {
+/** Utterance language and preferred natural-sounding voices, per interface language. */
+const SPEECH: Record<Locale, { lang: string; voices: RegExp }> = {
+  fr: { lang: "fr-FR", voices: /amélie|audrey|marie|thomas/i },
+  en: { lang: "en-GB", voices: /serena|kate|daniel|martha|arthur/i },
+  es: { lang: "es-ES", voices: /mónica|monica|marisol|jorge|paulina/i },
+};
+
+export function speak(text: string, locale: Locale = "fr") {
   if (typeof window === "undefined" || !("speechSynthesis" in window) || !text) return;
   const synth = window.speechSynthesis;
   synth.cancel();
+  const { lang, voices } = SPEECH[locale];
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "fr-FR";
+  u.lang = lang;
   u.rate = 0.95;
-  const fr = synth.getVoices().filter((v) => v.lang.toLowerCase().startsWith("fr"));
-  const voice = fr.find((v) => /amélie|audrey|marie|thomas/i.test(v.name)) ?? fr[0];
+  const all = synth.getVoices();
+  const exact = all.filter((v) => v.lang.toLowerCase().replace("_", "-") === lang.toLowerCase());
+  const sameLanguage = all.filter((v) => v.lang.toLowerCase().startsWith(locale));
+  const voice = exact.find((v) => voices.test(v.name)) ?? sameLanguage.find((v) => voices.test(v.name)) ?? exact[0] ?? sameLanguage[0];
   if (voice) u.voice = voice;
   synth.speak(u);
 }

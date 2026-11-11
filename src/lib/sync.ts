@@ -10,13 +10,25 @@ export interface SyncUser {
   photoURL: string | null;
 }
 
+/** Why sync or sign-in failed; the interface words it in the active language. */
+export type SyncError =
+  | "load-failed"
+  | "permission-denied"
+  | "unavailable"
+  | "sync-failed"
+  | "photo-too-large"
+  | "first-sync-offline"
+  | "unauthorized-domain"
+  | "popup-blocked"
+  | "sign-in-failed";
+
 export type SyncStatus =
   /** No Firebase config: the app is local-only. */
   | { state: "disabled" }
   | { state: "loading" }
-  | { state: "signed-out"; error?: string }
+  | { state: "signed-out"; error?: SyncError }
   | { state: "syncing" | "synced" | "offline"; user: SyncUser }
-  | { state: "error"; user: SyncUser; message: string };
+  | { state: "error"; user: SyncUser; error: SyncError };
 
 export const useSync = create<{ status: SyncStatus }>(() => ({
   status: { state: firebaseConfigured ? "loading" : "disabled" },
@@ -30,7 +42,7 @@ const load = () => (engine ??= import("./sync-engine"));
 
 function fail(err: unknown) {
   console.error(err);
-  setSyncStatus({ state: "signed-out", error: "Impossible de charger la connexion Google." });
+  setSyncStatus({ state: "signed-out", error: "load-failed" });
 }
 
 /** Starts listening to the Google session; safe to call several times. */

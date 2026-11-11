@@ -3,9 +3,16 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Check, Crown, GripVertical, MessageSquareText, X } from "lucide-react";
+import { format, useMessages } from "@/lib/i18n";
 import type { Pose, SequenceItem } from "@/lib/types";
 import { BreathPill, DurationPill, SidePill } from "./ItemPills";
 import { PoseThumb } from "./PoseThumb";
+
+const M = {
+  fr: { deleted: "Posture supprimée", move: "Déplacer {name}", select: "Sélectionner {name}", remove: "Retirer {name}", peak: "Posture pic" },
+  en: { deleted: "Deleted pose", move: "Move {name}", select: "Select {name}", remove: "Remove {name}", peak: "Peak pose" },
+  es: { deleted: "Postura eliminada", move: "Mover {name}", select: "Seleccionar {name}", remove: "Quitar {name}", peak: "Postura cumbre" },
+};
 
 export interface FlowItemProps {
   item: SequenceItem;
@@ -43,10 +50,11 @@ function Checkbox({ checked, onCheck, label }: { checked: boolean; onCheck: (shi
   );
 }
 
-/** Ligne de la vue liste. */
+/** Row of the list view. */
 export function FlowRow(p: FlowItemProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: p.item.id });
-  const name = p.pose?.nameFr ?? "Posture supprimée";
+  const m = useMessages(M);
+  const name = p.pose?.name ?? m.deleted;
   return (
     <li
       ref={setNodeRef}
@@ -61,18 +69,18 @@ export function FlowRow(p: FlowItemProps) {
           ref={setActivatorNodeRef}
           {...attributes}
           {...listeners}
-          aria-label={`Déplacer ${name}`}
+          aria-label={format(m.move, { name })}
           className="hidden cursor-grab touch-none text-muted/50 group-hover:text-muted active:cursor-grabbing sm:block"
         >
           <GripVertical size={16} />
         </button>
         <span className="w-5 text-right text-xs font-semibold text-muted tabular-nums">{p.index}</span>
-        <Checkbox checked={p.checked} onCheck={p.onCheck} label={`Sélectionner ${name}`} />
+        <Checkbox checked={p.checked} onCheck={p.onCheck} label={format(m.select, { name })} />
         <button type="button" onClick={p.onToggleExpand} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <span className="relative">
             {p.pose ? <PoseThumb pose={p.pose} size={46} className="rounded-xl" /> : <span className="block h-[46px] w-[46px] rounded-xl bg-line" />}
             {p.isPeak && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-surface shadow" title="Posture pic">
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-surface shadow" title={m.peak}>
                 <Crown size={11} />
               </span>
             )}
@@ -99,7 +107,7 @@ export function FlowRow(p: FlowItemProps) {
           <button
             type="button"
             onClick={p.onRemove}
-            aria-label={`Retirer ${name}`}
+            aria-label={format(m.remove, { name })}
             className="icon-btn h-8 w-8 opacity-100 hover:text-danger sm:opacity-0 sm:group-hover:opacity-100"
           >
             <X size={16} />
@@ -111,10 +119,11 @@ export function FlowRow(p: FlowItemProps) {
   );
 }
 
-/** Carte de la vue cartes. */
+/** Card of the card view. */
 export function FlowCard(p: FlowItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: p.item.id });
-  const name = p.pose?.nameFr ?? "Posture supprimée";
+  const m = useMessages(M);
+  const name = p.pose?.name ?? m.deleted;
   return (
     <li
       ref={setNodeRef}
@@ -137,10 +146,10 @@ export function FlowCard(p: FlowItemProps) {
           {p.index}
         </span>
         <span className="absolute top-2 right-2 z-[1]">
-          <Checkbox checked={p.checked} onCheck={p.onCheck} label={`Sélectionner ${name}`} />
+          <Checkbox checked={p.checked} onCheck={p.onCheck} label={format(m.select, { name })} />
         </span>
         {p.isPeak && (
-          <span className="absolute top-9 left-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-gold text-surface" title="Posture pic">
+          <span className="absolute top-9 left-2 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-gold text-surface" title={m.peak}>
             <Crown size={12} />
           </span>
         )}
@@ -160,7 +169,7 @@ export function FlowCard(p: FlowItemProps) {
       <button
         type="button"
         onClick={p.onRemove}
-        aria-label={`Retirer ${name}`}
+        aria-label={format(m.remove, { name })}
         className="absolute -top-2 -right-2 z-[2] hidden h-7 w-7 items-center justify-center rounded-full border border-line bg-surface text-danger shadow-soft group-hover:flex"
       >
         <X size={14} />

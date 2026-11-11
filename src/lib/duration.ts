@@ -1,4 +1,8 @@
+import type { Locale } from "./locale";
 import type { ClassPlan, Section, SequenceItem } from "./types";
+
+/** Abbreviation of "breaths" shown next to a hold. */
+const BREATHS: Record<Locale, string> = { fr: "resp.", en: "breaths", es: "resp." };
 
 /** Durée moyenne d'un cycle respiratoire en cours de yoga (inspiration + expiration). */
 export const SECONDS_PER_BREATH = 5;
@@ -23,15 +27,15 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`;
 }
 
-export function formatHold(item: SequenceItem): string {
+export function formatHold(item: SequenceItem, locale: Locale = "fr"): string {
   return item.unit === "respirations"
-    ? `${item.hold} resp.`
+    ? `${item.hold} ${BREATHS[locale]}`
     : formatDuration(item.hold);
 }
 
 /** Durée courte pour les pastilles : « 30 s », « 1 min 30 », « 5 resp. ». */
-export function formatHoldShort(item: SequenceItem): string {
-  if (item.unit === "respirations") return `${item.hold} resp.`;
+export function formatHoldShort(item: SequenceItem, locale: Locale = "fr"): string {
+  if (item.unit === "respirations") return `${item.hold} ${BREATHS[locale]}`;
   const s = item.hold;
   if (s < 60) return `${s} s`;
   const m = Math.floor(s / 60);

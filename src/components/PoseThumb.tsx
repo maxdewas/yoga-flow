@@ -36,18 +36,18 @@ export function PoseThumb({
   const box = `${size ? "" : fill ? "h-full w-full" : "aspect-square w-full"} shrink-0 overflow-hidden rounded-lg ${className}`;
   if (photo) {
     // eslint-disable-next-line @next/next/no-img-element -- local blob URL
-    return <img src={photo} alt={pose.nameFr} style={style} className={`${box} ${fill ? "object-contain" : "object-cover"}`} />;
+    return <img src={photo} alt={pose.name} style={style} className={`${box} ${fill ? "object-contain" : "object-cover"}`} />;
   }
   if (pose.image) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- static illustration, many small thumbnails
-      <img src={pose.image} alt={pose.nameFr} style={style} loading={eager ? "eager" : "lazy"} className={`${box} bg-thumb object-contain`} />
+      <img src={pose.image} alt={pose.name} style={style} loading={eager ? "eager" : "lazy"} className={`${box} bg-thumb object-contain`} />
     );
   }
   if (pose.figure) {
     return (
       <div style={style} className={`${box} bg-fig-bg p-[8%]`}>
-        <PoseFigure def={pose.figure} title={pose.nameFr} className="h-full w-full" />
+        <PoseFigure def={pose.figure} title={pose.name} className="h-full w-full" />
       </div>
     );
   }
@@ -57,7 +57,7 @@ export function PoseThumb({
       className={`${box} flex items-center justify-center bg-accent-soft font-semibold text-accent ${size ? "" : "text-3xl"}`}
       aria-hidden
     >
-      {initials(pose.nameFr)}
+      {initials(pose.name)}
     </div>
   );
 }

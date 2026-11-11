@@ -26,7 +26,7 @@ import {
 import { firebase } from "./firebase";
 import { clearPoseImages, listPoseImageIds, readPoseImage, setImageSink, storeSyncedImage } from "./images";
 import { useStore } from "./store";
-import { setSyncStatus, type SyncUser } from "./sync";
+import { setSyncStatus, type SyncError, type SyncUser } from "./sync";
 import type { ClassPlan } from "./types";
 
 type AppState = ReturnType<typeof useStore.getState>;
@@ -66,7 +66,7 @@ interface Session {
   serverSeen: Set<string>;
   imageQueue: Promise<void>;
   linkFailed: boolean;
-  error?: string;
+  error?: SyncError;
 }
 
 let session: Session | null = null;
@@ -140,23 +140,23 @@ function refresh() {
   const s = session;
   if (!s) return;
   const { user } = s;
-  if (s.error) setSyncStatus({ state: "error", user, message: s.error });
+  if (s.error) setSyncStatus({ state: "error", user, error: s.error });
   else if (!navigator.onLine) setSyncStatus({ state: "offline", user });
   else if (s.pending.size || s.inflight || s.serverSeen.size < KEYS.length + 1) setSyncStatus({ state: "syncing", user });
   else setSyncStatus({ state: "synced", user });
 }
 
-function describe(err: unknown): string {
+function describe(err: unknown): SyncError {
   const code = (err as { code?: string })?.code;
-  if (code === "permission-denied") return "Accès refusé par Firebase : vérifie les règles Firestore.";
-  if (code === "unavailable") return "Firebase est injoignable pour le moment.";
-  return "La synchronisation a échoué.";
+  if (code === "permission-denied") return "permission-denied";
+  if (code === "unavailable") return "unavailable";
+  return "sync-failed";
 }
 
-function fail(s: Session, err: unknown, message = describe(err)) {
+function fail(s: Session, err: unknown, error = describe(err)) {
   console.error(err);
   if (session !== s) return;
-  s.error = message;
+  s.error = error;
   refresh();
 }
 
@@ -245,7 +245,7 @@ async function uploadImage(s: Session, poseId: string, blob: Blob | null) {
   const data = await blobToDataUrl(blob);
   if (session !== s) return;
   if (data.length > MAX_IMAGE_CHARS) {
-    fail(s, new Error(`Photo ${poseId} : ${data.length} caractères`), "Une photo est trop lourde pour être synchronisée.");
+    fail(s, new Error(`Photo ${poseId} : ${data.length} caractères`), "photo-too-large");
     return;
   }
   const rev = crypto.randomUUID();
@@ -387,7 +387,7 @@ async function begin(s: Session) {
       await firstLink(s);
     } catch (err) {
       s.linkFailed = true;
-      fail(s, err, "Connexion internet nécessaire pour la première synchronisation.");
+      fail(s, err, "first-sync-offline");
       return;
     }
     if (session !== s) return;
@@ -473,10 +473,10 @@ export async function signIn() {
       state: "signed-out",
       error:
         code === "auth/unauthorized-domain"
-          ? "Ce site n'est pas autorisé dans Firebase (Authentication → Settings → Authorized domains)."
+          ? "unauthorized-domain"
           : code === "auth/popup-blocked"
-            ? "La fenêtre de connexion a été bloquée par le navigateur."
-            : "Connexion Google impossible.",
+            ? "popup-blocked"
+            : "sign-in-failed",
     });
   }
 }

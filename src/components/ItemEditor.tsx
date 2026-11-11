@@ -3,7 +3,23 @@
 import { Copy, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { useMessages } from "@/lib/i18n";
 import type { Pose, SequenceItem } from "@/lib/types";
+
+const M = {
+  fr: {
+    cuePlaceholder: "Consigne de guidage / transition : « Inspire, allonge la colonne… »",
+    sheetCues: "Consignes de la fiche", addToCue: "Ajouter à la consigne", duplicate: "Dupliquer", sheet: "Fiche", remove: "Retirer",
+  },
+  en: {
+    cuePlaceholder: "Cue / transition: “Inhale, lengthen the spine…”",
+    sheetCues: "Cues from the pose sheet", addToCue: "Add to the cue", duplicate: "Duplicate", sheet: "Pose sheet", remove: "Remove",
+  },
+  es: {
+    cuePlaceholder: "Indicación / transición: «Inhala, alarga la columna…»",
+    sheetCues: "Indicaciones de la ficha", addToCue: "Añadir a la indicación", duplicate: "Duplicar", sheet: "Ficha", remove: "Quitar",
+  },
+};
 
 interface Props {
   item: SequenceItem;
@@ -13,8 +29,9 @@ interface Props {
   onDuplicate: () => void;
 }
 
-/** Consigne de guidage d'une posture du cours, avec les consignes de la fiche à insérer en un clic. */
+/** Cue of a pose in the class, with the pose sheet's cues insertable in one click. */
 export function ItemEditor({ item, pose, onChange, onRemove, onDuplicate }: Props) {
+  const m = useMessages(M);
   const chips = pose?.details?.cuesShort ?? [];
   const box = useRef<HTMLDivElement>(null);
   const cue = useRef<HTMLTextAreaElement>(null);
@@ -32,19 +49,19 @@ export function ItemEditor({ item, pose, onChange, onRemove, onDuplicate }: Prop
         ref={cue}
         className="input bg-surface"
         rows={2}
-        placeholder="Consigne de guidage / transition : « Inspire, allonge la colonne… »"
+        placeholder={m.cuePlaceholder}
         value={item.cue}
         onChange={(e) => onChange({ cue: e.target.value })}
       />
       {chips.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-semibold text-muted">Consignes de la fiche</span>
+          <span className="text-xs font-semibold text-muted">{m.sheetCues}</span>
           {chips.map((c) => (
             <button
               key={c}
               type="button"
               className="chip text-left font-medium"
-              title="Ajouter à la consigne"
+              title={m.addToCue}
               onClick={() => onChange({ cue: item.cue ? `${item.cue.trimEnd()}\n${c}` : c })}
             >
               + {c}
@@ -54,15 +71,15 @@ export function ItemEditor({ item, pose, onChange, onRemove, onDuplicate }: Prop
       )}
       <div className="flex flex-wrap gap-1.5">
         <button className="btn py-1.5" onClick={onDuplicate}>
-          <Copy size={14} /> Dupliquer
+          <Copy size={14} /> {m.duplicate}
         </button>
         {pose && (
           <Link href={`/postures/${pose.id}`} className="btn py-1.5">
-            <ExternalLink size={14} /> Fiche
+            <ExternalLink size={14} /> {m.sheet}
           </Link>
         )}
         <button className="btn py-1.5 text-danger" onClick={onRemove}>
-          <Trash2 size={14} /> Retirer
+          <Trash2 size={14} /> {m.remove}
         </button>
       </div>
     </div>

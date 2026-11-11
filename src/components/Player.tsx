@@ -14,11 +14,59 @@ import {
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { formatClock, formatDuration } from "@/lib/duration";
-import { announcement, playSteps, type PlayStep } from "@/lib/player";
+import { format, useLabels, useLocale, useMessages } from "@/lib/i18n";
+import { announcement, playSteps, readyAnnouncement, VOICE, type PlayStep } from "@/lib/player";
 import { chime, endChime, gong, speak, stopSpeaking, unlockAudio } from "@/lib/sound";
 import { usePoseMap, useStore, type Prefs } from "@/lib/store";
-import { BREATH_LABELS, type ClassPlan } from "@/lib/types";
+import type { ClassPlan } from "@/lib/types";
 import { PoseThumb } from "./PoseThumb";
+
+const M = {
+  fr: {
+    options: "Options du lecteur", quit: "Quitter le cours", classFallback: "Cours", untitled: "Mon cours",
+    ready: "Prêt·e ?", stepsDuration: "{n} étapes · {duration}", start: "Commencer",
+    keys: "Espace pour pause · flèches pour naviguer", getReady: "Prépare-toi", firstPose: "Première posture : {name}",
+    pose: "Posture", previous: "Posture précédente", resume: "Reprendre", pause: "Pause", next: "Posture suivante",
+    paused: "En pause", practiced: "{n} étapes · {duration} de pratique", replay: "Rejouer", back: "Retour au cours",
+    upNext: "À suivre · {time}", poseList: "Liste des postures", optionsTitle: "Options", sequence: "Déroulé", close: "Fermer",
+    inhale: "Inspire", exhale: "Expire", namaste: "Namasté",
+    voice: "Guidage vocal", voiceHint: "Annonce chaque posture", voiceSanskrit: "Noms sanskrits à voix haute",
+    voiceCues: "Consignes à voix haute", startGong: "Bol chantant au début", changeChime: "Clochette à chaque posture",
+    endChime: "Carillon de fin", screenCues: "Consignes à l'écran", breathGuide: "Guide de respiration animé",
+    keepAwake: "Garder l'écran allumé", groups: ["Voix", "Sons", "Affichage"], rhythm: "Rythme",
+    countdown: "Compte à rebours", breathLength: "Durée d'une respiration",
+  },
+  en: {
+    options: "Player options", quit: "Leave the class", classFallback: "Class", untitled: "My class",
+    ready: "Ready?", stepsDuration: "{n} steps · {duration}", start: "Start",
+    keys: "Space to pause · arrows to navigate", getReady: "Get ready", firstPose: "First pose: {name}",
+    pose: "Pose", previous: "Previous pose", resume: "Resume", pause: "Pause", next: "Next pose",
+    paused: "Paused", practiced: "{n} steps · {duration} of practice", replay: "Play again", back: "Back to the class",
+    upNext: "Up next · {time}", poseList: "Pose list", optionsTitle: "Options", sequence: "Sequence", close: "Close",
+    inhale: "Inhale", exhale: "Exhale", namaste: "Namaste",
+    voice: "Voice guidance", voiceHint: "Announces each pose", voiceSanskrit: "Say Sanskrit names aloud",
+    voiceCues: "Say cues aloud", startGong: "Singing bowl at the start", changeChime: "Chime at each pose",
+    endChime: "Closing chime", screenCues: "Cues on screen", breathGuide: "Animated breathing guide",
+    keepAwake: "Keep the screen on", groups: ["Voice", "Sounds", "Display"], rhythm: "Pace",
+    countdown: "Countdown", breathLength: "Length of one breath",
+  },
+  es: {
+    options: "Opciones del reproductor", quit: "Salir de la clase", classFallback: "Clase", untitled: "Mi clase",
+    ready: "¿Todo listo?", stepsDuration: "{n} pasos · {duration}", start: "Empezar",
+    keys: "Espacio para pausar · flechas para navegar", getReady: "Prepárate", firstPose: "Primera postura: {name}",
+    pose: "Postura", previous: "Postura anterior", resume: "Reanudar", pause: "Pausa", next: "Postura siguiente",
+    paused: "En pausa", practiced: "{n} pasos · {duration} de práctica", replay: "Repetir", back: "Volver a la clase",
+    upNext: "A continuación · {time}", poseList: "Lista de posturas", optionsTitle: "Opciones", sequence: "Secuencia", close: "Cerrar",
+    inhale: "Inhala", exhale: "Exhala", namaste: "Namasté",
+    voice: "Guía por voz", voiceHint: "Anuncia cada postura", voiceSanskrit: "Nombres en sánscrito en voz alta",
+    voiceCues: "Indicaciones en voz alta", startGong: "Cuenco tibetano al empezar", changeChime: "Campanilla en cada postura",
+    endChime: "Campanas al final", screenCues: "Indicaciones en pantalla", breathGuide: "Guía de respiración animada",
+    keepAwake: "Mantener la pantalla encendida", groups: ["Voz", "Sonidos", "Pantalla"], rhythm: "Ritmo",
+    countdown: "Cuenta atrás", breathLength: "Duración de una respiración",
+  },
+};
+
+type Messages = (typeof M)["fr"];
 
 type Phase = "intro" | "ready" | "pose" | "done";
 
@@ -31,6 +79,9 @@ export function Player({ plan }: { plan: ClassPlan }) {
   const opts = useStore((s) => s.prefs.player);
   const showSanskrit = useStore((s) => s.prefs.showSanskrit);
   const setPrefs = useStore((s) => s.setPrefs);
+  const t = useMessages(M);
+  const L = useLabels();
+  const locale = useLocale();
   const steps = useMemo(() => playSteps(plan, poseMap, opts.secondsPerBreath), [plan, poseMap, opts.secondsPerBreath]);
   const totalSeconds = steps.reduce((n, s) => n + s.seconds, 0);
 
@@ -66,14 +117,14 @@ export function Player({ plan }: { plan: ClassPlan }) {
     setPhase("pose");
     restartClock();
     if (opts.changeChime && i > 0) chime();
-    if (opts.voice) speak(announcement(s, { sanskrit: opts.voiceSanskrit, cues: opts.voiceCues }));
+    if (opts.voice) speak(announcement(s, { sanskrit: opts.voiceSanskrit, cues: opts.voiceCues }, locale), locale);
   };
 
   const finish = () => {
     setPhase("done");
     setPaused(false);
     if (opts.endChime) endChime();
-    if (opts.voice) speak("C'est terminé. Prends un instant pour ressentir les effets de ta pratique. Namasté.");
+    if (opts.voice) speak(VOICE[locale].done, locale);
     void wake.current?.release().catch(() => {});
     wake.current = null;
   };
@@ -92,7 +143,7 @@ export function Player({ plan }: { plan: ClassPlan }) {
     if (opts.countdown > 0) {
       setPhase("ready");
       restartClock();
-      if (opts.voice) speak(`Prépare-toi. Première posture : ${steps[0]?.pose?.nameFr ?? ""}.`);
+      if (opts.voice) speak(readyAnnouncement(steps[0]?.pose, locale), locale);
     } else enterPose(0);
   };
 
@@ -116,7 +167,7 @@ export function Player({ plan }: { plan: ClassPlan }) {
     enterPose(i);
   };
 
-  // Horloge : un tick toutes les 100 ms tant que le cours tourne ; passe à l'étape suivante à la fin.
+  // Clock: one tick every 100 ms while the class runs; moves to the next step at the end.
   useEffect(() => {
     if (paused || (phase !== "pose" && phase !== "ready")) return;
     const timer = setInterval(() => {
@@ -161,32 +212,32 @@ export function Player({ plan }: { plan: ClassPlan }) {
       </div>
 
       <div className="flex items-center justify-between px-4 pt-3">
-        <button className="icon-btn bg-surface shadow-soft" onClick={() => setSheet(sheet === "options" ? null : "options")} aria-label="Options du lecteur">
+        <button className="icon-btn bg-surface shadow-soft" onClick={() => setSheet(sheet === "options" ? null : "options")} aria-label={t.options}>
           <SlidersHorizontal size={18} />
         </button>
         <p className="truncate px-3 text-xs font-bold tracking-[0.18em] text-muted uppercase">
-          {phase === "pose" ? step?.sectionTitle : plan.title || "Cours"}
+          {phase === "pose" ? step?.sectionTitle : plan.title || t.classFallback}
         </p>
-        <Link href={backHref} className="icon-btn bg-surface shadow-soft" aria-label="Quitter le cours">
+        <Link href={backHref} className="icon-btn bg-surface shadow-soft" aria-label={t.quit}>
           <X size={18} />
         </Link>
       </div>
 
       {phase === "intro" && (
         <Centered>
-          <p className="text-xs font-bold tracking-[0.25em] text-accent uppercase">Prêt·e ?</p>
-          <h1 className="mt-3 max-w-2xl text-center font-display text-4xl font-semibold sm:text-6xl">{plan.title || "Mon cours"}</h1>
+          <p className="text-xs font-bold tracking-[0.25em] text-accent uppercase">{t.ready}</p>
+          <h1 className="mt-3 max-w-2xl text-center font-display text-4xl font-semibold sm:text-6xl">{plan.title || t.untitled}</h1>
           <p className="mt-3 text-muted">
-            {steps.length} étapes · {formatDuration(totalSeconds)}
+            {format(t.stepsDuration, { n: steps.length, duration: formatDuration(totalSeconds) })}
           </p>
           <button
             onClick={start}
             className="mt-10 flex h-24 w-24 items-center justify-center rounded-full bg-accent text-surface shadow-lift transition hover:scale-105 active:scale-95"
-            aria-label="Commencer"
+            aria-label={t.start}
           >
             <Play size={38} fill="currentColor" className="ml-1.5" />
           </button>
-          <p className="mt-4 text-sm text-muted">Espace pour pause · flèches pour naviguer</p>
+          <p className="mt-4 text-sm text-muted">{t.keys}</p>
           {steps.length > 0 && (
             <div className="mt-8 flex -space-x-3">
               {steps.slice(0, 8).map((s) =>
@@ -203,8 +254,8 @@ export function Player({ plan }: { plan: ClassPlan }) {
 
       {phase === "ready" && (
         <Centered>
-          <p className="font-display text-4xl font-light tracking-wide sm:text-6xl">Prépare-toi</p>
-          <p className="mt-2 text-sm font-bold tracking-[0.2em] text-accent uppercase">Première posture : {steps[0]?.pose?.nameFr}</p>
+          <p className="font-display text-4xl font-light tracking-wide sm:text-6xl">{t.getReady}</p>
+          <p className="mt-2 text-sm font-bold tracking-[0.2em] text-accent uppercase">{format(t.firstPose, { name: steps[0]?.pose?.name ?? "" })}</p>
           <Ring progress={1 - remaining / (opts.countdown || 1)} size={180} className="mt-10">
             <span className="font-display text-6xl font-semibold tabular-nums">{Math.ceil(remaining)}</span>
           </Ring>
@@ -214,14 +265,14 @@ export function Player({ plan }: { plan: ClassPlan }) {
       {phase === "pose" && step && (
         <div className="flex min-h-0 flex-1 flex-col items-center px-4 pt-2 pb-4">
           <div className="text-center">
-            <h1 className="font-display text-3xl leading-tight font-semibold sm:text-5xl">{step.pose?.nameFr ?? "Posture"}</h1>
+            <h1 className="font-display text-3xl leading-tight font-semibold sm:text-5xl">{step.pose?.name ?? t.pose}</h1>
             <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm">
               {step.side && (
                 <span className={`rounded-full px-3 py-0.5 font-bold tracking-wider uppercase ${step.side === "droite" ? "bg-clay-soft text-clay" : "bg-lilac-soft text-lilac"}`}>
-                  {step.side === "droite" ? "Côté droit" : "Côté gauche"}
+                  {L.side[step.side]}
                 </span>
               )}
-              {step.breath !== "aucun" && <span className="rounded-full bg-accent-soft px-3 py-0.5 font-bold text-accent">{BREATH_LABELS[step.breath]}</span>}
+              {step.breath !== "aucun" && <span className="rounded-full bg-accent-soft px-3 py-0.5 font-bold text-accent">{L.breath[step.breath]}</span>}
               {showSanskrit && step.pose?.sanskrit && <span className="text-muted italic">{step.pose.sanskrit}</span>}
               <span className="text-muted">
                 {index + 1} / {steps.length}
@@ -230,7 +281,7 @@ export function Player({ plan }: { plan: ClassPlan }) {
           </div>
 
           <div className="relative flex min-h-0 w-full flex-1 items-center justify-center py-4">
-            <BreathHalo active={opts.breathGuide && !!step.breaths && !paused} spb={opts.secondsPerBreath} elapsed={elapsed}>
+            <BreathHalo labels={[t.inhale, t.exhale]} active={opts.breathGuide && !!step.breaths && !paused} spb={opts.secondsPerBreath} elapsed={elapsed}>
               {step.pose && (
                 <div className="aspect-square h-[min(62vw,42vh)] max-h-[440px] overflow-hidden rounded-[2.5rem] bg-thumb shadow-lift">
                   <PoseThumb pose={step.pose} className="h-full rounded-none" />
@@ -246,10 +297,10 @@ export function Player({ plan }: { plan: ClassPlan }) {
           ) : null}
 
           <div className="flex items-center gap-5">
-            <button className="icon-btn h-12 w-12 bg-surface shadow-soft" onClick={() => go(index - 1)} disabled={index === 0} aria-label="Posture précédente">
+            <button className="icon-btn h-12 w-12 bg-surface shadow-soft" onClick={() => go(index - 1)} disabled={index === 0} aria-label={t.previous}>
               <SkipBack size={20} />
             </button>
-            <button onClick={togglePause} aria-label={paused ? "Reprendre" : "Pause"} className="relative">
+            <button onClick={togglePause} aria-label={paused ? t.resume : t.pause} className="relative">
               <Ring progress={elapsed / (phaseLength || 1)} size={112}>
                 <span className="flex flex-col items-center">
                   <span className="font-display text-2xl font-semibold tabular-nums">{formatClock(remaining)}</span>
@@ -257,27 +308,27 @@ export function Player({ plan }: { plan: ClassPlan }) {
                 </span>
               </Ring>
             </button>
-            <button className="icon-btn h-12 w-12 bg-surface shadow-soft" onClick={() => go(index + 1)} aria-label="Posture suivante">
+            <button className="icon-btn h-12 w-12 bg-surface shadow-soft" onClick={() => go(index + 1)} aria-label={t.next}>
               <SkipForward size={20} />
             </button>
           </div>
-          {paused && <p className="mt-2 text-xs font-bold tracking-widest text-muted uppercase">En pause</p>}
+          {paused && <p className="mt-2 text-xs font-bold tracking-widest text-muted uppercase">{t.paused}</p>}
         </div>
       )}
 
       {phase === "done" && (
         <Centered>
           <p className="text-6xl">🙏</p>
-          <h1 className="mt-4 font-display text-5xl font-semibold sm:text-6xl">Namasté</h1>
+          <h1 className="mt-4 font-display text-5xl font-semibold sm:text-6xl">{t.namaste}</h1>
           <p className="mt-3 text-muted">
-            {steps.length} étapes · {formatDuration(totalSeconds)} de pratique
+            {format(t.practiced, { n: steps.length, duration: formatDuration(totalSeconds) })}
           </p>
           <div className="mt-8 flex gap-3">
             <button className="btn" onClick={start}>
-              <RotateCcw size={16} /> Rejouer
+              <RotateCcw size={16} /> {t.replay}
             </button>
             <Link href={backHref} className="btn-primary">
-              <ArrowLeft size={16} /> Retour au cours
+              <ArrowLeft size={16} /> {t.back}
             </Link>
           </div>
         </Centered>
@@ -290,15 +341,15 @@ export function Player({ plan }: { plan: ClassPlan }) {
         >
           {next.pose && <PoseThumb pose={next.pose} size={48} className="rounded-xl" />}
           <span className="min-w-0">
-            <span className="block text-[10px] font-bold tracking-widest text-muted uppercase">À suivre · {formatClock(next.seconds)}</span>
-            <span className="block truncate text-sm font-semibold">{next.pose?.nameFr}</span>
-            {next.side && <span className="block text-[11px] text-muted">{next.side === "droite" ? "Droite" : "Gauche"}</span>}
+            <span className="block text-[10px] font-bold tracking-widest text-muted uppercase">{format(t.upNext, { time: formatClock(next.seconds) })}</span>
+            <span className="block truncate text-sm font-semibold">{next.pose?.name}</span>
+            {next.side && <span className="block text-[11px] text-muted">{L.sideShort[next.side]}</span>}
           </span>
         </button>
       )}
 
       {phase !== "intro" && phase !== "done" && (
-        <button className="icon-btn absolute bottom-4 left-4 h-11 w-11 bg-surface shadow-soft" onClick={() => setSheet(sheet === "list" ? null : "list")} aria-label="Liste des postures">
+        <button className="icon-btn absolute bottom-4 left-4 h-11 w-11 bg-surface shadow-soft" onClick={() => setSheet(sheet === "list" ? null : "list")} aria-label={t.poseList}>
           <ListOrdered size={18} />
         </button>
       )}
@@ -307,13 +358,13 @@ export function Player({ plan }: { plan: ClassPlan }) {
         <div className="absolute inset-0 z-10 flex animate-fade justify-start bg-black/25" onClick={() => setSheet(null)}>
           <div className="h-full w-full max-w-sm animate-rise overflow-y-auto bg-background p-5 shadow-lift" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-2xl font-semibold">{sheet === "options" ? "Options" : "Déroulé"}</h2>
-              <button className="icon-btn" onClick={() => setSheet(null)} aria-label="Fermer">
+              <h2 className="font-display text-2xl font-semibold">{sheet === "options" ? t.optionsTitle : t.sequence}</h2>
+              <button className="icon-btn" onClick={() => setSheet(null)} aria-label={t.close}>
                 <X size={18} />
               </button>
             </div>
             {sheet === "options" ? (
-              <PlayerOptions opts={opts} onChange={(p) => setPrefs({ player: p })} />
+              <PlayerOptions t={t} opts={opts} onChange={(p) => setPrefs({ player: p })} />
             ) : (
               <ol className="space-y-1">
                 {steps.map((s, i) => (
@@ -330,10 +381,10 @@ export function Player({ plan }: { plan: ClassPlan }) {
                       <span className="w-5 text-right text-xs text-muted">{i + 1}</span>
                       {s.pose && <PoseThumb pose={s.pose} size={36} className="rounded-lg" />}
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{s.pose?.nameFr}</span>
+                        <span className="block truncate text-sm font-semibold">{s.pose?.name}</span>
                         <span className="block text-[11px] text-muted">
                           {formatClock(s.seconds)}
-                          {s.side && ` · ${s.side}`}
+                          {s.side && ` · ${L.sideShort[s.side]}`}
                         </span>
                       </span>
                     </button>
@@ -378,8 +429,8 @@ function Ring({ progress, size, className = "", children }: { progress: number; 
   );
 }
 
-/** Halo qui s'élargit à l'inspiration et se resserre à l'expiration, au rythme choisi. */
-function BreathHalo({ active, spb, elapsed, children }: { active: boolean; spb: number; elapsed: number; children: ReactNode }) {
+/** Halo that widens on the inhale and narrows on the exhale, at the chosen pace. */
+function BreathHalo({ labels, active, spb, elapsed, children }: { labels: [string, string]; active: boolean; spb: number; elapsed: number; children: ReactNode }) {
   const inhale = active && elapsed % spb < spb / 2;
   return (
     <div className="relative flex items-center justify-center">
@@ -390,7 +441,7 @@ function BreathHalo({ active, spb, elapsed, children }: { active: boolean; spb: 
             style={{ transform: `scale(${inhale ? 1.12 : 1.0})`, transition: `transform ${spb / 2}s ease-in-out` }}
           />
           <span className="absolute -bottom-3 z-[1] rounded-full bg-surface px-3 py-1 text-xs font-bold tracking-widest text-accent uppercase shadow-soft">
-            {inhale ? "Inspire" : "Expire"}
+            {inhale ? labels[0] : labels[1]}
           </span>
         </>
       )}
@@ -399,25 +450,25 @@ function BreathHalo({ active, spb, elapsed, children }: { active: boolean; spb: 
   );
 }
 
-function PlayerOptions({ opts, onChange }: { opts: Prefs["player"]; onChange: (p: Partial<Prefs["player"]>) => void }) {
+function PlayerOptions({ t, opts, onChange }: { t: Messages; opts: Prefs["player"]; onChange: (p: Partial<Prefs["player"]>) => void }) {
   const toggles: [keyof Prefs["player"], string, string?][][] = [
     [
-      ["voice", "Guidage vocal", "Annonce chaque posture"],
-      ["voiceSanskrit", "Noms sanskrits à voix haute"],
-      ["voiceCues", "Consignes à voix haute"],
+      ["voice", t.voice, t.voiceHint],
+      ["voiceSanskrit", t.voiceSanskrit],
+      ["voiceCues", t.voiceCues],
     ],
     [
-      ["startGong", "Bol chantant au début"],
-      ["changeChime", "Clochette à chaque posture"],
-      ["endChime", "Carillon de fin"],
+      ["startGong", t.startGong],
+      ["changeChime", t.changeChime],
+      ["endChime", t.endChime],
     ],
     [
-      ["screenCues", "Consignes à l'écran"],
-      ["breathGuide", "Guide de respiration animé"],
-      ["keepAwake", "Garder l'écran allumé"],
+      ["screenCues", t.screenCues],
+      ["breathGuide", t.breathGuide],
+      ["keepAwake", t.keepAwake],
     ],
   ];
-  const titles = ["Voix", "Sons", "Affichage"];
+  const titles = t.groups;
   return (
     <div className="space-y-5">
       {toggles.map((group, gi) => (
@@ -443,11 +494,11 @@ function PlayerOptions({ opts, onChange }: { opts: Prefs["player"]; onChange: (p
         </section>
       ))}
       <section>
-        <h3 className="mb-1.5 text-[11px] font-bold tracking-wider text-muted uppercase">Rythme</h3>
+        <h3 className="mb-1.5 text-[11px] font-bold tracking-wider text-muted uppercase">{t.rhythm}</h3>
         <div className="space-y-3 rounded-2xl border border-line bg-surface p-3.5">
-          <Stepper label="Compte à rebours" value={opts.countdown} unit="s" options={[0, 3, 5, 10]} onChange={(v) => onChange({ countdown: v })} />
+          <Stepper label={t.countdown} value={opts.countdown} unit="s" options={[0, 3, 5, 10]} onChange={(v) => onChange({ countdown: v })} />
           <Stepper
-            label="Durée d'une respiration"
+            label={t.breathLength}
             value={opts.secondsPerBreath}
             unit="s"
             options={[3, 4, 5, 6, 8]}

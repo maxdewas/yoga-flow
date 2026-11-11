@@ -4,6 +4,8 @@
  * Les liens vers d'autres postures sont des ids du catalogue.
  */
 
+import type { Audience, BodyPosition, BodyZone, PoseTag, Prop, Shape } from "./labels";
+
 export type Position = "debout" | "assise" | "a-genoux" | "quatre-pattes" | "dos" | "ventre" | "cote" | "inversee" | "mains";
 export type PoseType = "etirement" | "renforcement" | "equilibre" | "mobilite" | "relaxation" | "respiration" | "meditation";
 export type Suitability = "oui" | "avec-adaptation" | "deconseille";
@@ -65,53 +67,21 @@ export interface PoseDetails {
   koshas?: Kosha[];
   meridians?: string[];
   styles?: string[];
-}
 
-export const POSITION_LABELS: Record<Position, string> = {
-  debout: "Debout",
-  assise: "Assise",
-  "a-genoux": "À genoux",
-  "quatre-pattes": "À quatre pattes",
-  dos: "Sur le dos",
-  ventre: "Sur le ventre",
-  cote: "Sur le côté",
-  inversee: "Inversée",
-  mains: "Sur les mains",
-};
-export const TYPE_LABELS: Record<PoseType, string> = {
-  etirement: "Étirement",
-  renforcement: "Renforcement",
-  equilibre: "Équilibre",
-  mobilite: "Mobilité",
-  relaxation: "Relaxation",
-  respiration: "Respiration",
-  meditation: "Méditation",
-};
-export const SUITABILITY_LABELS: Record<Suitability, string> = {
-  oui: "Oui",
-  "avec-adaptation": "Avec adaptation",
-  deconseille: "Déconseillé",
-};
-export const CHAKRA_LABELS: Record<Chakra, string> = {
-  racine: "Racine (Muladhara)",
-  sacre: "Sacré (Svadhisthana)",
-  plexus: "Plexus solaire (Manipura)",
-  coeur: "Cœur (Anahata)",
-  gorge: "Gorge (Vishuddha)",
-  "troisieme-oeil": "Troisième œil (Ajna)",
-  couronne: "Couronne (Sahasrara)",
-};
-export const DOSHA_LABELS: Record<Dosha, string> = { vata: "Vata", pitta: "Pitta", kapha: "Kapha" };
-export const ELEMENT_LABELS: Record<Element, string> = { terre: "Terre", eau: "Eau", feu: "Feu", air: "Air", ether: "Éther" };
-export const GUNA_LABELS: Record<Guna, string> = { sattva: "Sattva", rajas: "Rajas", tamas: "Tamas" };
-export const VAYU_LABELS: Record<Vayu, string> = { prana: "Prana", apana: "Apana", samana: "Samana", udana: "Udana", vyana: "Vyana" };
-export const KOSHA_LABELS: Record<Kosha, string> = {
-  annamaya: "Annamaya (corps physique)",
-  pranamaya: "Pranamaya (énergie)",
-  manomaya: "Manomaya (mental)",
-  vijnanamaya: "Vijnanamaya (sagesse)",
-  anandamaya: "Anandamaya (félicité)",
-};
+  /** Faits du catalogue importé (codes, libellés selon la langue). */
+  bodyPositions?: BodyPosition[];
+  zones?: BodyZone[];
+  audiences?: Audience[];
+  /** Matériel ou pratique particulière (chaise, hamac, aqua…). */
+  equipment?: Prop[];
+  tags?: PoseTag[];
+  shapes?: Shape[];
+  /** Rang de popularité dans le catalogue importé (1 = la plus utilisée). */
+  popularityRank?: number;
+  /** Postures souvent placées juste avant / juste après, avec leur fréquence (%). */
+  oftenBefore?: { id: string; pct: number }[];
+  oftenAfter?: { id: string; pct: number }[];
+}
 
 /** Merges a teacher's edits over the catalog details (field by field; lists are replaced, not concatenated). */
 export function mergeDetails(base: PoseDetails | undefined, edit: PoseDetails | undefined): PoseDetails | undefined {

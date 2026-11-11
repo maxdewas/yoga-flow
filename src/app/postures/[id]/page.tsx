@@ -7,15 +7,47 @@ import { PoseSheet, sheetCompleteness } from "@/components/PoseSheet";
 import { diffEdit, PoseSheetForm } from "@/components/PoseSheetForm";
 import { PoseThumb } from "@/components/PoseThumb";
 import { deletePoseImage, savePoseImage, usePoseImage } from "@/lib/images";
-import { BUILTIN_POSES } from "@/lib/poses";
-import { useAllPoses, useHydrated, usePoseMap, useStore } from "@/lib/store";
-import { CATEGORY_LABELS, LEVEL_LABELS } from "@/lib/types";
+import { useAllPoses, useCatalog, useHydrated, usePoseMap, useStore } from "@/lib/store";
+import { format, useLabels, useMessages } from "@/lib/i18n";
+
+const M = {
+  fr: {
+    notFound: "Posture introuvable.", back: "Retour", poses: "← Postures", changePhoto: "Changer la photo", myPhoto: "Ma photo",
+    remove: "Retirer", badImage: "Impossible de lire cette image.", bothSides: "Des deux côtés", custom: "Perso",
+    edited: "Fiche modifiée", filled: "Fiche remplie à {n} %", complete: "Compléter la fiche", edit: "Modifier la fiche",
+    resetConfirm: "Revenir à la fiche d'origine du catalogue ?", reset: "Revenir à la fiche d'origine",
+    inUse: "Cette posture est utilisée dans un cours : retire-la d'abord.", deleteConfirm: "Supprimer « {name} » ?",
+    delete: "Supprimer", notes: "Mes notes", notesPlaceholder: "Variantes, accessoires, consignes que tu aimes donner…",
+    usedIn: "Utilisée dans mes cours", untitled: "Cours sans titre", variantOf: "Variante de", imported: "Catalogue Éléonore",
+  },
+  en: {
+    notFound: "Pose not found.", back: "Back", poses: "← Poses", changePhoto: "Change photo", myPhoto: "My photo",
+    remove: "Remove", badImage: "This image can't be read.", bothSides: "Both sides", custom: "Custom",
+    edited: "Sheet edited", filled: "Sheet {n}% complete", complete: "Complete the sheet", edit: "Edit the sheet",
+    resetConfirm: "Go back to the original catalogue sheet?", reset: "Back to the original sheet",
+    inUse: "This pose is used in a class: remove it there first.", deleteConfirm: "Delete “{name}”?",
+    delete: "Delete", notes: "My notes", notesPlaceholder: "Variations, props, cues you like to give…",
+    usedIn: "Used in my classes", untitled: "Untitled class", variantOf: "Variation of", imported: "Éléonore's catalogue",
+  },
+  es: {
+    notFound: "Postura no encontrada.", back: "Volver", poses: "← Posturas", changePhoto: "Cambiar la foto", myPhoto: "Mi foto",
+    remove: "Quitar", badImage: "No se puede leer esta imagen.", bothSides: "Ambos lados", custom: "Personal",
+    edited: "Ficha modificada", filled: "Ficha completa al {n} %", complete: "Completar la ficha", edit: "Editar la ficha",
+    resetConfirm: "¿Volver a la ficha original del catálogo?", reset: "Volver a la ficha original",
+    inUse: "Esta postura se usa en una clase: quítala primero.", deleteConfirm: "¿Eliminar «{name}»?",
+    delete: "Eliminar", notes: "Mis notas", notesPlaceholder: "Variantes, accesorios, indicaciones que te gusta dar…",
+    usedIn: "Usada en mis clases", untitled: "Clase sin título", variantOf: "Variante de", imported: "Catálogo de Éléonore",
+  },
+};
 
 export default function PoseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const hydrated = useHydrated();
+  const t = useMessages(M);
+  const L = useLabels();
   const router = useRouter();
   const poses = useAllPoses();
+  const catalog = useCatalog();
   const poseMap = usePoseMap();
   const pose = poseMap.get(id);
   const note = useStore((s) => s.poseNotes[id] ?? "");
@@ -30,19 +62,19 @@ export default function PoseDetailPage() {
   if (!pose)
     return (
       <p>
-        Posture introuvable. <Link href="/postures" className="text-accent underline">Retour</Link>
+        {t.notFound} <Link href="/postures" className="text-accent underline">{t.back}</Link>
       </p>
     );
 
   // The pose as shipped (catalog) or as created (custom), before the teacher's edits.
-  const base = BUILTIN_POSES.find((p) => p.id === id) ?? customPoses.find((p) => p.id === id) ?? pose;
+  const base = catalog.find((p) => p.id === id) ?? customPoses.find((p) => p.id === id) ?? pose;
   const usedIn = plans.filter((p) => p.sections.some((s) => s.items.some((it) => it.poseId === id)));
   const completeness = sheetCompleteness(pose.details);
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <Link href="/postures" className="text-sm text-muted hover:text-foreground">
-        ← Postures
+        {t.poses}
       </Link>
 
       <header className="flex flex-col gap-5 sm:flex-row">
@@ -50,11 +82,11 @@ export default function PoseDetailPage() {
           <PoseThumb pose={pose} />
           <div className="flex flex-wrap gap-2">
             <button className="btn" onClick={() => fileRef.current?.click()}>
-              {photo ? "Changer la photo" : "Ma photo"}
+              {photo ? t.changePhoto : t.myPhoto}
             </button>
             {photo && (
               <button className="btn text-danger" onClick={() => deletePoseImage(id)}>
-                Retirer
+                {t.remove}
               </button>
             )}
           </div>
@@ -71,7 +103,7 @@ export default function PoseDetailPage() {
                 setError(null);
                 await savePoseImage(id, f);
               } catch {
-                setError("Impossible de lire cette image.");
+                setError(t.badImage);
               }
             }}
           />
@@ -80,7 +112,7 @@ export default function PoseDetailPage() {
 
         <div className="flex-1 space-y-3">
           <div>
-            <h1 className="text-2xl font-bold">{pose.nameFr}</h1>
+            <h1 className="text-2xl font-bold">{pose.name}</h1>
             <p className="text-muted italic">
               {pose.sanskrit}
               {pose.nameEn && ` · ${pose.nameEn}`}
@@ -88,20 +120,26 @@ export default function PoseDetailPage() {
           </div>
           <div className="flex flex-wrap gap-1.5">
             <span className="chip" data-active>
-              {LEVEL_LABELS[pose.level]}
+              {L.level[pose.level]}
             </span>
             {pose.categories.map((c) => (
               <span key={c} className="chip">
-                {CATEGORY_LABELS[c]}
+                {L.category[c]}
               </span>
             ))}
-            {pose.sided && <span className="chip">Des deux côtés</span>}
-            {pose.custom && <span className="chip">Perso</span>}
-            {edited && <span className="chip">Fiche modifiée</span>}
+            {pose.sided && <span className="chip">{t.bothSides}</span>}
+            {pose.custom && <span className="chip">{t.custom}</span>}
+            {edited && <span className="chip">{t.edited}</span>}
+            {pose.imported && <span className="chip">{t.imported}</span>}
+            {pose.variantOf && poseMap.get(pose.variantOf) && (
+              <Link href={`/postures/${pose.variantOf}`} className="chip hover:border-accent">
+                {t.variantOf} {poseMap.get(pose.variantOf)!.name}
+              </Link>
+            )}
           </div>
           <div>
             <div className="flex items-center justify-between text-xs text-muted">
-              <span>Fiche remplie à {completeness} %</span>
+              <span>{format(t.filled, { n: completeness })}</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
               <div className="h-full bg-accent" style={{ width: `${completeness}%` }} />
@@ -110,29 +148,29 @@ export default function PoseDetailPage() {
           {!editing && (
             <div className="flex flex-wrap gap-2">
               <button className="btn-primary" onClick={() => setEditing(true)}>
-                {completeness < 100 ? "Compléter la fiche" : "Modifier la fiche"}
+                {completeness < 100 ? t.complete : t.edit}
               </button>
               {edited && !pose.custom && (
                 <button
                   className="btn"
-                  onClick={() => confirm("Revenir à la fiche d'origine du catalogue ?") && resetPoseEdit(id)}
+                  onClick={() => confirm(t.resetConfirm) && resetPoseEdit(id)}
                 >
-                  Revenir à la fiche d&apos;origine
+                  {t.reset}
                 </button>
               )}
               {pose.custom && (
                 <button
                   className="btn text-danger"
                   onClick={() => {
-                    if (usedIn.length) return alert("Cette posture est utilisée dans un cours : retire-la d'abord.");
-                    if (!confirm(`Supprimer « ${pose.nameFr} » ?`)) return;
+                    if (usedIn.length) return alert(t.inUse);
+                    if (!confirm(format(t.deleteConfirm, { name: pose.name }))) return;
                     deleteCustomPose(id);
                     resetPoseEdit(id);
                     deletePoseImage(id);
                     router.push("/postures");
                   }}
                 >
-                  Supprimer
+                  {t.delete}
                 </button>
               )}
             </div>
@@ -159,22 +197,22 @@ export default function PoseDetailPage() {
 
       {!editing && (
         <section className="space-y-2 border-t border-line pt-4">
-          <h2 className="text-lg font-bold">Mes notes</h2>
+          <h2 className="text-lg font-bold">{t.notes}</h2>
           <textarea
             className="input"
             rows={4}
-            placeholder="Variantes, accessoires, consignes que tu aimes donner…"
+            placeholder={t.notesPlaceholder}
             value={note}
             onChange={(e) => setPoseNote(id, e.target.value)}
           />
           {usedIn.length > 0 && (
             <div className="text-sm">
-              <h3 className="font-semibold">Utilisée dans mes cours</h3>
+              <h3 className="font-semibold">{t.usedIn}</h3>
               <ul className="mt-1 flex flex-wrap gap-2">
                 {usedIn.map((p) => (
                   <li key={p.id}>
                     <Link href={`/cours/${p.id}`} className="chip hover:border-accent">
-                      {p.title || "Cours sans titre"}
+                      {p.title || t.untitled}
                     </Link>
                   </li>
                 ))}

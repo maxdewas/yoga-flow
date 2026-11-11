@@ -7,7 +7,11 @@
 import { writeFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PoseFigure } from "../src/components/PoseFigure";
-import { BUILTIN_POSES } from "../src/lib/poses";
+import { buildCatalog } from "../src/lib/poses";
+import FR from "../src/lib/catalog/locales/fr.json";
+import type { LocaleContent } from "../src/lib/catalog/localize";
+
+const BUILTIN_POSES = buildCatalog("fr", FR as LocaleContent).filter((p) => !p.imported);
 import { FAMILIES } from "../src/lib/catalog/families";
 
 const [family = "all", out = "figures.html"] = process.argv.slice(2);

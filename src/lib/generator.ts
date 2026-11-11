@@ -1,5 +1,6 @@
 import { planSeconds } from "./duration";
-import { SUN_SALUTATION_A, SUN_SALUTATION_DOUCE, sectionsFromSteps, type Step } from "./templates";
+import { format, LOCALES, type Locale, type Localized } from "./locale";
+import { isTemplateTitle, SECTION_TITLES as T, SUN_SALUTATION_A, SUN_SALUTATION_DOUCE, sectionsFromSteps, type Step, type StepSection } from "./templates";
 import type { Category, ClassPlan, ClassStyle, Level, Pose } from "./types";
 
 /**
@@ -15,6 +16,23 @@ export interface GeneratorOptions {
 }
 
 const LEVEL_RANK: Record<Level, number> = { debutant: 0, intermediaire: 1, avance: 2 };
+
+/** Style names used in generated titles (« Vinyasa 45 min »). */
+const STYLE_NAMES: Localized<Record<ClassStyle, string>> = {
+  fr: { vinyasa: "Vinyasa", power: "Power", hatha: "Hatha", doux: "Yoga doux", yin: "Yin", restauratif: "Restauratif" },
+  en: { vinyasa: "Vinyasa", power: "Power", hatha: "Hatha", doux: "Gentle yoga", yin: "Yin", restauratif: "Restorative" },
+  es: { vinyasa: "Vinyasa", power: "Power", hatha: "Hatha", doux: "Yoga suave", yin: "Yin", restauratif: "Restaurativo" },
+};
+const generatedTitle = (style: ClassStyle, minutes: number, locale: Locale) => `${STYLE_NAMES[locale][style]} ${minutes} min`;
+
+const SALUTATIONS: Localized<string> = { fr: "Salutations au soleil ×{n}", en: "Sun salutations ×{n}", es: "Saludos al sol ×{n}" };
+
+/** Whether `title` was written by the app (generated or template title, any language), so a new load may replace it. */
+export function isAutoTitle(title: string): boolean {
+  if (isTemplateTitle(title)) return true;
+  const m = /^(.+) \d+ min$/.exec(title);
+  return !!m && LOCALES.some((l) => Object.values(STYLE_NAMES[l]).includes(m[1]));
+}
 
 const BREATHS: Record<ClassStyle, number> = { vinyasa: 5, power: 5, hatha: 8, doux: 6, yin: 0, restauratif: 0 };
 
@@ -42,13 +60,16 @@ const isStillness = (p: Pose) => p.family === "yin" && !p.id.startsWith("yin-");
 /** Poses for active styles (vinyasa, hatha, doux, power): everything outside the yin family, plus custom poses. */
 const isActive = (p: Pose) => p.family !== "yin";
 
-export function generatePlan(opts: GeneratorOptions, poses: Pose[]): Pick<ClassPlan, "sections" | "title"> {
+/** Generates a class whose title and section titles are written in `locale`. */
+export function generatePlan(opts: GeneratorOptions, allPoses: Pose[], locale: Locale): Pick<ClassPlan, "sections" | "title"> {
+  // Imported poses (thousands of variations, props, section markers) stay out of generated classes:
+  // the rules below were written for the hand-picked catalogue.
+  const poses = allPoses.filter((p) => !p.imported);
   const allowed = poses.filter((p) => LEVEL_RANK[p.level] <= LEVEL_RANK[opts.level]);
   const byId = new Map(poses.map((p) => [p.id, p]));
   const isSided = (id: string) => byId.get(id)?.sided ?? false;
   const target = opts.targetMinutes * 60;
-  const estimate = (secs: { title: string; steps: Step[] }[]) =>
-    planSeconds({ sections: sectionsFromSteps(secs, isSided) } as ClassPlan);
+  const estimate = (secs: StepSection[]) => planSeconds({ sections: sectionsFromSteps(secs, isSided, locale) } as ClassPlan);
 
   if (opts.style === "yin" || opts.style === "restauratif") {
     const yin = opts.style === "yin";
@@ -61,16 +82,16 @@ export function generatePlan(opts: GeneratorOptions, poses: Pose[]): Pick<ClassP
     );
     const seat = shuffle(allowed.filter((p) => isStillness(p) && p.id.startsWith("med-") && !has(p, "allongee")))[0];
     const main: Step[] = [];
-    const secs = [
-      { title: "Arrivée", steps: [[seat?.id ?? "crocodile", 120, "secondes"]] as Step[] },
-      { title: yin ? "Postures yin" : "Postures soutenues", steps: main },
-      { title: "Relaxation", steps: [["savasana", yin ? 360 : 600, "secondes"]] as Step[] },
+    const secs: StepSection[] = [
+      { title: T.arrivee, steps: [[seat?.id ?? "crocodile", 120, "secondes"]] },
+      { title: yin ? T.posturesYin : T.posturesSoutenues, steps: main },
+      { title: T.relaxation, steps: [["savasana", yin ? 360 : 600, "secondes"]] },
     ];
     for (const p of pool) {
       if (estimate(secs) + hold * (p.sided ? 2 : 1) > target) continue;
       main.push([p.id, hold, "secondes"]);
     }
-    return { title: `${yin ? "Yin" : "Restauratif"} ${opts.targetMinutes} min`, sections: sectionsFromSteps(secs, isSided) };
+    return { title: generatedTitle(opts.style, opts.targetMinutes, locale), sections: sectionsFromSteps(secs, isSided, locale) };
   }
 
   const b = BREATHS[opts.style];
@@ -118,15 +139,18 @@ export function generatePlan(opts: GeneratorOptions, poses: Pose[]): Pick<ClassP
   ];
 
   const savasanaSecs = Math.max(300, Math.round(target * 0.1 / 60) * 60);
-  const secs = [
-    { title: "Centrage", steps: centrage },
-    { title: "Échauffement", steps: warmup },
-    { title: rounds > 1 ? `Salutations au soleil ×${rounds}` : "Salutation au soleil", steps: salutationSteps },
-    { title: "Série debout", steps: standing },
-    { title: "Équilibre", steps: balance },
-    ...(peak ? [{ title: "Posture au sommet", steps: [[peak.id, b] as Step, ...counter] }] : []),
-    { title: "Au sol", steps: floor },
-    { title: "Relaxation", steps: [["savasana", savasanaSecs, "secondes"] as Step] },
+  const salutationTitle: Localized<string> =
+    rounds > 1 ? { fr: format(SALUTATIONS.fr, { n: rounds }), en: format(SALUTATIONS.en, { n: rounds }), es: format(SALUTATIONS.es, { n: rounds }) } : T.salutation;
+  const peakSteps: Step[] = peak ? [[peak.id, b], ...counter] : [];
+  const secs: StepSection[] = [
+    { title: T.centrage, steps: centrage },
+    { title: T.echauffement, steps: warmup },
+    { title: salutationTitle, steps: salutationSteps },
+    { title: T.serieDebout, steps: standing },
+    { title: T.equilibre, steps: balance },
+    ...(peak ? [{ title: T.sommet, steps: peakSteps }] : []),
+    { title: T.auSol, steps: floor },
+    { title: T.relaxation, steps: [["savasana", savasanaSecs, "secondes"]] },
   ];
 
   // Fill up to the target length, alternating between standing and floor work.
@@ -152,7 +176,7 @@ export function generatePlan(opts: GeneratorOptions, poses: Pose[]): Pick<ClassP
   }
 
   // Not enough distinct poses for a long class: hold the held poses longer (up to ×3), never the flowing salutations.
-  const held = [standing, balance, floor, ...(peak ? [secs.find((s) => s.title === "Posture au sommet")!.steps] : [])];
+  const held = [standing, balance, floor, ...(peak ? [peakSteps] : [])];
   const base = held.map((list) => list.map((s) => s[1]));
   for (let factor = 1.25; factor <= 3 && estimate(secs) < target * 0.92; factor += 0.25) {
     held.forEach((list, i) => list.forEach((step, j) => (step[1] = Math.round(base[i][j] * factor))));
@@ -161,10 +185,9 @@ export function generatePlan(opts: GeneratorOptions, poses: Pose[]): Pick<ClassP
     held.forEach((list, i) => list.forEach((step, j) => (step[1] = Math.max(base[i][j], Math.round(step[1] / 1.25)))));
   }
 
-  const name = { vinyasa: "Vinyasa", power: "Power", hatha: "Hatha", doux: "Yoga doux" }[opts.style];
   return {
-    title: `${name} ${opts.targetMinutes} min`,
-    sections: sectionsFromSteps(secs.filter((s) => s.steps.length), isSided),
+    title: generatedTitle(opts.style, opts.targetMinutes, locale),
+    sections: sectionsFromSteps(secs.filter((s) => s.steps.length), isSided, locale),
   };
 }
 

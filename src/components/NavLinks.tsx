@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLocale } from "@/lib/i18n";
 import { NAV_LINKS } from "./nav-config";
 
 export function NavLinks() {
   const pathname = usePathname();
+  const locale = useLocale();
   return NAV_LINKS.map((l) => {
     const active = l.href === "/" ? pathname === "/" || pathname.startsWith("/cours") : pathname.startsWith(l.href);
     return (
@@ -17,7 +19,7 @@ export function NavLinks() {
           active ? "bg-surface text-foreground shadow-soft" : "text-muted hover:text-foreground"
         }`}
       >
-        {l.label}
+        {l.label[locale]}
       </Link>
     );
   });

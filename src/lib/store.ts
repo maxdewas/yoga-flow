@@ -2,15 +2,27 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { mergeDetails, type PoseDetails } from "./details";
-import { BUILTIN_POSES } from "./poses";
+import { detectLocale, type Locale, type Localized } from "./locale";
+import type { LocaleContent } from "./catalog/localize";
+import { buildCatalog, loadContent, loadedContent } from "./poses";
 import type { ClassPlan, Pose, SavedSequence, Section, SequenceItem } from "./types";
 
 const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
 
-export function newPlan(): ClassPlan {
+const NEW_PLAN_SECTIONS: Localized<[string, string, string]> = {
+  fr: ["Centrage & échauffement", "Cœur de séance", "Retour au calme"],
+  en: ["Centering & warm-up", "Main practice", "Cool-down"],
+  es: ["Centramiento y calentamiento", "Parte principal", "Vuelta a la calma"],
+};
+
+/** Suffix of a duplicated plan's title. */
+const COPY_SUFFIX: Localized<string> = { fr: "(copie)", en: "(copy)", es: "(copia)" };
+
+/** Empty plan whose default section titles are written in `locale`. */
+export function newPlan(locale: Locale = detectLocale()): ClassPlan {
   return {
     id: uid(),
     title: "",
@@ -20,11 +32,7 @@ export function newPlan(): ClassPlan {
     intention: "",
     level: "debutant",
     notes: "",
-    sections: [
-      { id: uid(), title: "Centrage & échauffement", items: [] },
-      { id: uid(), title: "Cœur de séance", items: [] },
-      { id: uid(), title: "Retour au calme", items: [] },
-    ],
+    sections: NEW_PLAN_SECTIONS[locale].map((title) => ({ id: uid(), title, items: [] })),
     createdAt: now(),
     updatedAt: now(),
   };
@@ -44,6 +52,8 @@ export function newItem(pose: Pose): SequenceItem {
 
 /** Préférences d'affichage de l'éditeur et du lecteur, propres à cet appareil. */
 export interface Prefs {
+  /** Interface and catalogue language; absent = the browser's language. */
+  locale?: Locale;
   view: "liste" | "cartes";
   showSanskrit: boolean;
   panel: "postures" | "analyse" | null;
@@ -123,7 +133,7 @@ interface State {
   deletePlan: (id: string) => void;
   updatePlan: (id: string, patch: Partial<Omit<ClassPlan, "id">>) => void;
   setSections: (id: string, sections: Section[]) => void;
-  addCustomPose: (pose: Omit<Pose, "id" | "custom">) => string;
+  addCustomPose: (pose: Omit<Pose, "id" | "custom" | "name">) => string;
   deleteCustomPose: (id: string) => void;
   setPoseNote: (poseId: string, note: string) => void;
   setPoseEdit: (poseId: string, edit: PoseEdit) => void;
@@ -149,7 +159,7 @@ export const useStore = create<State>()(
       sequences: [],
       prefs: DEFAULT_PREFS,
       createPlan: () => {
-        const plan = newPlan();
+        const plan = newPlan(get().prefs.locale ?? detectLocale());
         set((s) => ({ plans: [plan, ...s.plans] }));
         return plan.id;
       },
@@ -159,7 +169,7 @@ export const useStore = create<State>()(
         const copy: ClassPlan = {
           ...structuredClone(src),
           id: uid(),
-          title: `${src.title} (copie)`,
+          title: `${src.title} ${COPY_SUFFIX[get().prefs.locale ?? detectLocale()]}`,
           createdAt: now(),
           updatedAt: now(),
         };
@@ -179,7 +189,7 @@ export const useStore = create<State>()(
       setSections: (id, sections) => get().updatePlan(id, { sections }),
       addCustomPose: (pose) => {
         const id = `perso-${uid().slice(0, 8)}`;
-        set((s) => ({ customPoses: [...s.customPoses, { ...pose, id, custom: true }] }));
+        set((s) => ({ customPoses: [...s.customPoses, { ...pose, name: pose.nameFr, id, custom: true }] }));
         return id;
       },
       deleteCustomPose: (id) =>
@@ -261,20 +271,38 @@ export function useHydrated() {
   );
 }
 
-/** Applies a teacher's edit over a pose; details are merged field by field. */
+/** Applies a teacher's edit over a pose; details are merged field by field. Her own name wins in every language. */
 export function applyEdit(pose: Pose, edit: PoseEdit | undefined): Pose {
   if (!edit) return pose;
-  return { ...pose, ...edit, details: mergeDetails(pose.details, edit.details) };
+  return { ...pose, ...edit, ...(edit.nameFr && { name: edit.nameFr }), details: mergeDetails(pose.details, edit.details) };
+}
+
+/** Built-in catalogue in the active language; re-renders once that language's texts are loaded. */
+export function useCatalog(): Pose[] {
+  const locale = useStore((s) => s.prefs.locale) ?? detectLocale();
+  // Texts loaded for a language; until then the catalogue renders with what is already loaded.
+  const [fetched, setFetched] = useState<{ locale: Locale; content: LocaleContent } | null>(null);
+  const content = fetched?.locale === locale ? fetched.content : loadedContent(locale);
+  useEffect(() => {
+    let live = true;
+    loadContent(locale).then((c) => live && setFetched({ locale, content: c }));
+    return () => {
+      live = false;
+    };
+  }, [locale]);
+  return useMemo(() => buildCatalog(locale, content), [locale, content]);
 }
 
 /** Catalog + custom poses, with the teacher's edits applied. */
 export function useAllPoses(): Pose[] {
+  const catalog = useCatalog();
   const custom = useStore((s) => s.customPoses);
   const edits = useStore((s) => s.poseEdits);
   return useMemo(() => {
-    const all = custom.length ? [...BUILTIN_POSES, ...custom] : BUILTIN_POSES;
+    // Custom poses saved before display names existed have no `name`: their own name is the French one.
+    const all = custom.length ? [...catalog, ...custom.map((p) => ({ ...p, name: p.nameFr }))] : catalog;
     return Object.keys(edits).length ? all.map((p) => applyEdit(p, edits[p.id])) : all;
-  }, [custom, edits]);
+  }, [catalog, custom, edits]);
 }
 
 export function usePoseMap(): Map<string, Pose> {

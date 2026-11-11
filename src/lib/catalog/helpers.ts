@@ -17,5 +17,5 @@ export function p(
   benefits: string[],
   contraindications: string[] = [],
 ): Pose {
-  return { id, nameFr, sanskrit, nameEn, categories, level, sided, description, benefits, contraindications };
+  return { id, name: nameFr, nameFr, sanskrit, nameEn, categories, level, sided, description, benefits, contraindications };
 }

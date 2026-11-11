@@ -2,14 +2,80 @@
 
 import { CloudAlert, CloudCheck, CloudOff, LogIn, LogOut, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
-import { signIn, signOut, startSync, useSync, type SyncStatus } from "@/lib/sync";
+import { format, useMessages } from "@/lib/i18n";
+import { signIn, signOut, startSync, useSync, type SyncError, type SyncStatus } from "@/lib/sync";
 import { MenuItem, Popover } from "./ui/Popover";
 
-const LABELS: Record<"syncing" | "synced" | "offline" | "error", string> = {
-  syncing: "Synchronisation…",
-  synced: "Tout est enregistré dans ton compte",
-  offline: "Hors ligne : les changements partiront au retour du réseau",
-  error: "Erreur de synchronisation",
+const M = {
+  fr: {
+    state: {
+      syncing: "Synchronisation…",
+      synced: "Tout est enregistré dans ton compte",
+      offline: "Hors ligne : les changements partiront au retour du réseau",
+    },
+    errors: {
+      "load-failed": "Impossible de charger la connexion Google.",
+      "permission-denied": "Accès refusé par Firebase : vérifie les règles Firestore.",
+      unavailable: "Firebase est injoignable pour le moment.",
+      "sync-failed": "La synchronisation a échoué.",
+      "photo-too-large": "Une photo est trop lourde pour être synchronisée.",
+      "first-sync-offline": "Connexion internet nécessaire pour la première synchronisation.",
+      "unauthorized-domain": "Ce site n'est pas autorisé dans Firebase (Authentication → Settings → Authorized domains).",
+      "popup-blocked": "La fenêtre de connexion a été bloquée par le navigateur.",
+      "sign-in-failed": "Connexion Google impossible.",
+    } satisfies Record<SyncError, string>,
+    signInTitle: "Sauvegarder tes cours dans ton compte Google",
+    signIn: "Se connecter",
+    signOut: "Se déconnecter",
+    confirmSignOut: "Certains changements ne sont pas encore envoyés et seront perdus. Se déconnecter quand même ?",
+    account: "Compte {email} — {message}",
+  },
+  en: {
+    state: {
+      syncing: "Syncing…",
+      synced: "Everything is saved to your account",
+      offline: "Offline: changes will be sent once you're back online",
+    },
+    errors: {
+      "load-failed": "Couldn't load Google sign-in.",
+      "permission-denied": "Access denied by Firebase: check the Firestore rules.",
+      unavailable: "Firebase can't be reached right now.",
+      "sync-failed": "Sync failed.",
+      "photo-too-large": "A photo is too large to be synced.",
+      "first-sync-offline": "An internet connection is needed for the first sync.",
+      "unauthorized-domain": "This site isn't authorized in Firebase (Authentication → Settings → Authorized domains).",
+      "popup-blocked": "The sign-in window was blocked by the browser.",
+      "sign-in-failed": "Google sign-in failed.",
+    } satisfies Record<SyncError, string>,
+    signInTitle: "Save your classes to your Google account",
+    signIn: "Sign in",
+    signOut: "Sign out",
+    confirmSignOut: "Some changes haven't been sent yet and will be lost. Sign out anyway?",
+    account: "Account {email} — {message}",
+  },
+  es: {
+    state: {
+      syncing: "Sincronizando…",
+      synced: "Todo está guardado en tu cuenta",
+      offline: "Sin conexión: los cambios se enviarán cuando vuelva la red",
+    },
+    errors: {
+      "load-failed": "No se pudo cargar el inicio de sesión de Google.",
+      "permission-denied": "Firebase denegó el acceso: revisa las reglas de Firestore.",
+      unavailable: "Firebase no está disponible en este momento.",
+      "sync-failed": "La sincronización ha fallado.",
+      "photo-too-large": "Una foto es demasiado pesada para sincronizarse.",
+      "first-sync-offline": "Se necesita conexión a internet para la primera sincronización.",
+      "unauthorized-domain": "Este sitio no está autorizado en Firebase (Authentication → Settings → Authorized domains).",
+      "popup-blocked": "El navegador bloqueó la ventana de inicio de sesión.",
+      "sign-in-failed": "No se pudo iniciar sesión con Google.",
+    } satisfies Record<SyncError, string>,
+    signInTitle: "Guarda tus clases en tu cuenta de Google",
+    signIn: "Iniciar sesión",
+    signOut: "Cerrar sesión",
+    confirmSignOut: "Algunos cambios aún no se han enviado y se perderán. ¿Cerrar sesión de todos modos?",
+    account: "Cuenta {email} — {message}",
+  },
 };
 
 function StatusIcon({ status }: { status: SyncStatus }) {
@@ -30,6 +96,7 @@ function StatusIcon({ status }: { status: SyncStatus }) {
 
 /** Google sign-in that keeps classes, poses and photos in the teacher's account. Hidden when Firebase is not configured. */
 export function AccountButton() {
+  const t = useMessages(M);
   const status = useSync((s) => s.status);
 
   // Runs after the first paint, so the Firebase SDK never delays the page.
@@ -43,29 +110,29 @@ export function AccountButton() {
       <div className="flex items-center gap-2">
         {status.error && (
           <span className="hidden max-w-56 text-xs text-danger sm:inline" role="alert">
-            {status.error}
+            {t.errors[status.error]}
           </span>
         )}
         <button
           type="button"
           onClick={() => signIn()}
-          title={status.error ?? "Sauvegarder tes cours dans ton compte Google"}
+          title={status.error ? t.errors[status.error] : t.signInTitle}
           className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-muted transition hover:text-foreground"
         >
           <LogIn className="h-4 w-4" />
-          <span className="hidden sm:inline">Se connecter</span>
+          <span className="hidden sm:inline">{t.signIn}</span>
         </button>
       </div>
     );
   }
 
   const { user } = status;
-  const message = status.state === "error" ? status.message : LABELS[status.state];
+  const message = status.state === "error" ? t.errors[status.error] : t.state[status.state];
 
   const onSignOut = async () => {
     if (
       status.state !== "synced" &&
-      !confirm("Certains changements ne sont pas encore envoyés et seront perdus. Se déconnecter quand même ?")
+      !confirm(t.confirmSignOut)
     ) {
       return;
     }
@@ -80,7 +147,7 @@ export function AccountButton() {
         <button
           type="button"
           onClick={toggle}
-          aria-label={`Compte ${user.email ?? ""} — ${message}`}
+          aria-label={format(t.account, { email: user.email ?? "", message })}
           title={message}
           className="relative flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold shadow-soft"
         >
@@ -115,7 +182,7 @@ export function AccountButton() {
               void onSignOut();
             }}
           >
-            Se déconnecter
+            {t.signOut}
           </MenuItem>
         </div>
       )}

@@ -4,12 +4,56 @@ import { Clock, LayoutTemplate, Sparkles, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { formatDuration } from "@/lib/duration";
 import type { GeneratorOptions } from "@/lib/generator";
+import { useLabels, useLocale, useMessages } from "@/lib/i18n";
 import { TEMPLATES, type Template } from "@/lib/templates";
-import { CATEGORY_LABELS, LEVEL_LABELS, STYLE_LABELS, type Category, type ClassStyle, type Level } from "@/lib/types";
+import type { Category, ClassStyle, Level } from "@/lib/types";
+
+const M = {
+  fr: {
+    close: "Fermer",
+    generateTitle: "Générer un cours",
+    generateIntro:
+      "Une séquence complète (centrage, échauffement, salutations, debout, posture au sommet, contre-postures, sol, relaxation) adaptée au style, au niveau et à la durée. Tout reste modifiable ensuite.",
+    style: "Style",
+    level: "Niveau",
+    duration: "Durée",
+    focus: "Focus",
+    balanced: "Équilibré",
+    generate: "Générer le cours",
+    templatesTitle: "Cours prêts à l'emploi",
+  },
+  en: {
+    close: "Close",
+    generateTitle: "Generate a class",
+    generateIntro:
+      "A complete sequence (centering, warm-up, salutations, standing, peak pose, counter-poses, floor, relaxation) tailored to the style, level and length. Everything stays editable afterwards.",
+    style: "Style",
+    level: "Level",
+    duration: "Length",
+    focus: "Focus",
+    balanced: "Balanced",
+    generate: "Generate class",
+    templatesTitle: "Ready-made classes",
+  },
+  es: {
+    close: "Cerrar",
+    generateTitle: "Generar una clase",
+    generateIntro:
+      "Una secuencia completa (centramiento, calentamiento, saludos, de pie, postura cumbre, contraposturas, suelo, relajación) adaptada al estilo, al nivel y a la duración. Después puedes modificarlo todo.",
+    style: "Estilo",
+    level: "Nivel",
+    duration: "Duración",
+    focus: "Enfoque",
+    balanced: "Equilibrado",
+    generate: "Generar la clase",
+    templatesTitle: "Clases listas para usar",
+  },
+};
 
 export const DURATIONS = [20, 30, 45, 60, 75, 90];
 
 export function Modal({ title, icon, onClose, children }: { title: string; icon?: ReactNode; onClose: () => void; children: ReactNode }) {
+  const t = useMessages(M);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -26,7 +70,7 @@ export function Modal({ title, icon, onClose, children }: { title: string; icon?
         <div className="mb-4 flex items-center gap-3">
           {icon && <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent-soft text-accent">{icon}</span>}
           <h2 className="font-display text-2xl font-semibold">{title}</h2>
-          <button className="icon-btn ml-auto" onClick={onClose} aria-label="Fermer">
+          <button className="icon-btn ml-auto" onClick={onClose} aria-label={t.close}>
             <X size={18} />
           </button>
         </div>
@@ -70,42 +114,41 @@ export function GeneratorDialog({
   onGenerate: (opts: GeneratorOptions) => void;
   onClose: () => void;
 }) {
+  const t = useMessages(M);
+  const L = useLabels();
   const [style, setStyle] = useState<ClassStyle>(initial.style);
   const [level, setLevel] = useState<Level>(initial.level);
   const [targetMinutes, setTarget] = useState(initial.targetMinutes);
   const [focus, setFocus] = useState<Category | "">("");
   return (
-    <Modal title="Générer un cours" icon={<Sparkles size={20} />} onClose={onClose}>
-      <p className="mb-5 text-sm text-muted">
-        Une séquence complète (centrage, échauffement, salutations, debout, posture au sommet, contre-postures, sol,
-        relaxation) adaptée au style, au niveau et à la durée. Tout reste modifiable ensuite.
-      </p>
+    <Modal title={t.generateTitle} icon={<Sparkles size={20} />} onClose={onClose}>
+      <p className="mb-5 text-sm text-muted">{t.generateIntro}</p>
       <div className="space-y-4">
         <ChipGroup
-          label="Style"
+          label={t.style}
           value={style}
           onChange={setStyle}
-          options={(Object.keys(STYLE_LABELS) as ClassStyle[]).map((s) => ({ id: s, label: STYLE_LABELS[s] }))}
+          options={(Object.keys(L.style) as ClassStyle[]).map((s) => ({ id: s, label: L.style[s] }))}
         />
         <ChipGroup
-          label="Niveau"
+          label={t.level}
           value={level}
           onChange={setLevel}
-          options={(Object.keys(LEVEL_LABELS) as Level[]).map((l) => ({ id: l, label: LEVEL_LABELS[l] }))}
+          options={(Object.keys(L.level) as Level[]).map((l) => ({ id: l, label: L.level[l] }))}
         />
-        <ChipGroup label="Durée" value={targetMinutes} onChange={setTarget} options={DURATIONS.map((d) => ({ id: d, label: `${d} min` }))} />
+        <ChipGroup label={t.duration} value={targetMinutes} onChange={setTarget} options={DURATIONS.map((d) => ({ id: d, label: `${d} min` }))} />
         <ChipGroup
-          label="Focus"
+          label={t.focus}
           value={focus}
           onChange={setFocus}
           options={[
-            { id: "" as Category | "", label: "Équilibré" },
-            ...(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => ({ id: c as Category | "", label: CATEGORY_LABELS[c] })),
+            { id: "" as Category | "", label: t.balanced },
+            ...(Object.keys(L.category) as Category[]).map((c) => ({ id: c as Category | "", label: L.category[c] })),
           ]}
         />
       </div>
       <button className="btn-primary mt-6 w-full py-3 text-base" onClick={() => onGenerate({ style, level, targetMinutes, focus: focus || null })}>
-        <Sparkles size={18} /> Générer le cours
+        <Sparkles size={18} /> {t.generate}
       </button>
     </Modal>
   );
@@ -120,20 +163,23 @@ export function TemplatesDialog({
   onClose: () => void;
   durationOf: (t: Template) => number;
 }) {
+  const t = useMessages(M);
+  const L = useLabels();
+  const locale = useLocale();
   return (
-    <Modal title="Cours prêts à l'emploi" icon={<LayoutTemplate size={20} />} onClose={onClose}>
+    <Modal title={t.templatesTitle} icon={<LayoutTemplate size={20} />} onClose={onClose}>
       <ul className="grid gap-2.5 sm:grid-cols-2">
-        {TEMPLATES.map((t) => (
-          <li key={t.id}>
+        {TEMPLATES.map((tpl) => (
+          <li key={tpl.id}>
             <button
               className="h-full w-full rounded-2xl border border-line bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-soft"
-              onClick={() => onPick(t)}
+              onClick={() => onPick(tpl)}
             >
-              <span className="text-[11px] font-bold tracking-wider text-accent uppercase">{STYLE_LABELS[t.style]}</span>
-              <span className="mt-0.5 block font-display text-lg leading-tight font-semibold">{t.title}</span>
-              <span className="mt-1 block text-xs text-muted">{t.theme}</span>
+              <span className="text-[11px] font-bold tracking-wider text-accent uppercase">{L.style[tpl.style]}</span>
+              <span className="mt-0.5 block font-display text-lg leading-tight font-semibold">{tpl.title[locale]}</span>
+              <span className="mt-1 block text-xs text-muted">{tpl.theme[locale]}</span>
               <span className="mt-2 flex items-center gap-1.5 text-xs font-semibold">
-                <Clock size={12} /> ≈ {formatDuration(durationOf(t))} · {LEVEL_LABELS[t.level]}
+                <Clock size={12} /> ≈ {formatDuration(durationOf(tpl))} · {L.level[tpl.level]}
               </span>
             </button>
           </li>

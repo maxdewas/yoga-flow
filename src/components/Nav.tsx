@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { AccountButton } from "./AccountButton";
+import { LocaleSwitcher } from "./LocaleSwitcher";
 import { NavLinks } from "./NavLinks";
 import { NAV_LINKS } from "./nav-config";
 
@@ -19,14 +20,15 @@ export function Nav() {
           <Suspense
             fallback={NAV_LINKS.map((l) => (
               <Link key={l.href} href={l.href} className="rounded-full px-3 py-1.5 text-sm font-semibold text-muted">
-                {l.label}
+                {l.label.fr}
               </Link>
             ))}
           >
             <NavLinks />
           </Suspense>
         </div>
-        <div className="sm:ml-auto">
+        <div className="flex items-center gap-1 sm:ml-auto">
+          <LocaleSwitcher />
           <AccountButton />
         </div>
       </nav>

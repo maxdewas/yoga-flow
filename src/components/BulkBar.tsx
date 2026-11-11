@@ -1,8 +1,15 @@
 "use client";
 
 import { BookmarkPlus, ClipboardPaste, Copy, CopyPlus, Scissors, Trash2, X } from "lucide-react";
+import { useMessages } from "@/lib/i18n";
 import type { Breath, HoldUnit, Side } from "@/lib/types";
 import { BreathPill, DurationPill, SidePill } from "./ItemPills";
+
+const M = {
+  fr: { clear: "Tout désélectionner", selected: "sélectionnée", selectedMany: "sélectionnées", cut: "Couper", copy: "Copier", paste: "Coller", duplicate: "Dupliquer", save: "Enregistrer", remove: "Supprimer" },
+  en: { clear: "Deselect all", selected: "selected", selectedMany: "selected", cut: "Cut", copy: "Copy", paste: "Paste", duplicate: "Duplicate", save: "Save", remove: "Delete" },
+  es: { clear: "Deseleccionar todo", selected: "seleccionada", selectedMany: "seleccionadas", cut: "Cortar", copy: "Copiar", paste: "Pegar", duplicate: "Duplicar", save: "Guardar", remove: "Eliminar" },
+};
 
 interface Props {
   count: number;
@@ -36,23 +43,24 @@ function Action({ icon, label, onClick, disabled, danger }: { icon: React.ReactN
   );
 }
 
-/** Actions sur les postures cochées. */
+/** Actions on the checked poses. */
 export function BulkBar(p: Props) {
+  const m = useMessages(M);
   return (
     <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-3">
       <div className="flex max-w-full animate-rise items-center gap-1 rounded-full border border-line bg-surface p-1.5 shadow-lift">
-        <button className="icon-btn h-8 w-8" onClick={p.onClear} aria-label="Tout désélectionner">
+        <button className="icon-btn h-8 w-8" onClick={p.onClear} aria-label={m.clear}>
           <X size={16} />
         </button>
         <span className="shrink-0 pr-1 text-xs font-bold whitespace-nowrap">
-          {p.count} <span className="hidden sm:inline">sélectionnée{p.count > 1 ? "s" : ""}</span>
+          {p.count} <span className="hidden sm:inline">{p.count > 1 ? m.selectedMany : m.selected}</span>
         </span>
         <div className="scrollbar-none flex items-center gap-0.5 overflow-x-auto">
-          <Action icon={<Scissors size={15} />} label="Couper" onClick={p.onCut} />
-          <Action icon={<Copy size={15} />} label="Copier" onClick={p.onCopy} />
-          <Action icon={<ClipboardPaste size={15} />} label="Coller" onClick={p.onPaste} disabled={!p.canPaste} />
-          <Action icon={<CopyPlus size={15} />} label="Dupliquer" onClick={p.onDuplicate} />
-          <Action icon={<BookmarkPlus size={15} />} label="Enregistrer" onClick={p.onSave} />
+          <Action icon={<Scissors size={15} />} label={m.cut} onClick={p.onCut} />
+          <Action icon={<Copy size={15} />} label={m.copy} onClick={p.onCopy} />
+          <Action icon={<ClipboardPaste size={15} />} label={m.paste} onClick={p.onPaste} disabled={!p.canPaste} />
+          <Action icon={<CopyPlus size={15} />} label={m.duplicate} onClick={p.onDuplicate} />
+          <Action icon={<BookmarkPlus size={15} />} label={m.save} onClick={p.onSave} />
         </div>
         <span className="mx-0.5 h-5 w-px shrink-0 bg-line" />
         <div className="flex shrink-0 items-center gap-1">
@@ -60,7 +68,7 @@ export function BulkBar(p: Props) {
           <SidePill onChange={p.onSide} />
           <BreathPill onChange={p.onBreath} align="end" />
         </div>
-        <Action icon={<Trash2 size={15} />} label="Supprimer" onClick={p.onDelete} danger />
+        <Action icon={<Trash2 size={15} />} label={m.remove} onClick={p.onDelete} danger />
       </div>
     </div>
   );

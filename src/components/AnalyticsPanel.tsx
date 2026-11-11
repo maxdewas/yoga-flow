@@ -2,10 +2,11 @@
 
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Crown, Flame, Hexagon, LineChart, Scale, Sparkle, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { CHAKRA_COLORS, CHAKRA_SHORT, ZONE_LABELS, type FlowAnalysis, type Zone } from "@/lib/analytics";
-import { CHAKRA_LABELS } from "@/lib/details";
+import { CHAKRA_COLORS, CHAKRA_SHORT, type FlowAnalysis, type Insight, type Zone } from "@/lib/analytics";
 import { formatDuration } from "@/lib/duration";
-import { CATEGORY_LABELS, LEVEL_LABELS, type Category, type Level, type Pose } from "@/lib/types";
+import { format, useLabels, useLocale, useMessages } from "@/lib/i18n";
+import type { Chakra } from "@/lib/details";
+import type { Category, Level, Pose } from "@/lib/types";
 import { PoseThumb } from "./PoseThumb";
 
 interface Props {
@@ -14,6 +15,101 @@ interface Props {
   poseOf: (itemId: string) => Pose | undefined;
   onHighlight: (ids: string[] | null) => void;
   onClose: () => void;
+}
+
+const M = {
+  fr: {
+    title: "Analyse du cours", close: "Fermer l'analyse", empty: "Ajoute des postures pour voir l'analyse de ton cours.",
+    poses: "Postures", of: "sur {n} min", avgLevel: "Niveau moyen",
+    tips: "Conseils", tipsHint: "Survole un conseil pour voir les postures concernées",
+    peak: "Posture pic", peakHint: "Le sommet d'intensité du cours",
+    dynamics: "Dynamique", curveHint: "Intensité au fil du cours", barsHint: "Temps passé par niveau", curve: "Courbe", bars: "Barres",
+    sides: "Équilibre des côtés", sidesHint: "Temps à gauche et à droite",
+    zones: "Zones sollicitées", zonesHint: "Estimation d'après les familles de postures",
+    families: "Familles de postures", familiesHint: "Temps passé par famille",
+    chakras: "Chakras", chakrasHint: "Repères traditionnels indicatifs", radar: "Radar",
+    footnote: "Intensité, zones et chakras sont des repères calculés à partir des familles et du niveau des postures, pas des mesures.",
+    curveLabel: "Courbe d'intensité du cours", intensity: "{i}. intensité {v} / 5", start: "Début",
+    left: "Gauche", right: "Droite", leftShort: "G", rightShort: "D",
+    neutral: "Face / sans côté : {a} · Des deux côtés : {b}",
+    front: "Face", back: "Dos", bodyMap: "Carte des zones sollicitées", chakraRadar: "Radar des chakras",
+    insights: {
+      "unmatched-sides": "{name} : {right} fois à droite, {left} fois à gauche.",
+      "above-level": "{n} posture(s) au-dessus du niveau du cours.",
+      "intense-start": "Le début est intense : prévois un échauffement plus doux.",
+      "no-rest-end": "Le cours ne se termine pas par une posture de repos (Savasana…).",
+      "over-target": "Le cours dépasse la durée visée de {n} min.",
+      "under-target": "Il manque environ {n} min pour atteindre la durée visée.",
+      balanced: "Cours équilibré : côtés, niveau, début et fin sont cohérents.",
+    },
+  },
+  en: {
+    title: "Class analysis", close: "Close the analysis", empty: "Add poses to see your class analysis.",
+    poses: "Poses", of: "of {n} min", avgLevel: "Average level",
+    tips: "Tips", tipsHint: "Hover over a tip to see the poses involved",
+    peak: "Peak pose", peakHint: "The intensity high point of the class",
+    dynamics: "Dynamics", curveHint: "Intensity across the class", barsHint: "Time spent per level", curve: "Curve", bars: "Bars",
+    sides: "Side balance", sidesHint: "Time on the left and on the right",
+    zones: "Areas worked", zonesHint: "Estimated from the pose families",
+    families: "Pose families", familiesHint: "Time spent per family",
+    chakras: "Chakras", chakrasHint: "Traditional, indicative markers", radar: "Radar",
+    footnote: "Intensity, areas and chakras are markers computed from the families and levels of the poses, not measurements.",
+    curveLabel: "Class intensity curve", intensity: "{i}. intensity {v} / 5", start: "Start",
+    left: "Left", right: "Right", leftShort: "L", rightShort: "R",
+    neutral: "Front / no side: {a} · Both sides: {b}",
+    front: "Front", back: "Back", bodyMap: "Map of the areas worked", chakraRadar: "Chakra radar",
+    insights: {
+      "unmatched-sides": "{name}: {right} time(s) on the right, {left} time(s) on the left.",
+      "above-level": "{n} pose(s) above the class level.",
+      "intense-start": "The start is intense: plan a gentler warm-up.",
+      "no-rest-end": "The class does not end with a resting pose (Savasana…).",
+      "over-target": "The class runs {n} min over the target length.",
+      "under-target": "About {n} min short of the target length.",
+      balanced: "Balanced class: sides, level, start and end are consistent.",
+    },
+  },
+  es: {
+    title: "Análisis de la clase", close: "Cerrar el análisis", empty: "Añade posturas para ver el análisis de tu clase.",
+    poses: "Posturas", of: "de {n} min", avgLevel: "Nivel medio",
+    tips: "Consejos", tipsHint: "Pasa el cursor por un consejo para ver las posturas implicadas",
+    peak: "Postura pico", peakHint: "El punto de máxima intensidad de la clase",
+    dynamics: "Dinámica", curveHint: "Intensidad a lo largo de la clase", barsHint: "Tiempo por nivel", curve: "Curva", bars: "Barras",
+    sides: "Equilibrio de lados", sidesHint: "Tiempo a la izquierda y a la derecha",
+    zones: "Zonas trabajadas", zonesHint: "Estimación según las familias de posturas",
+    families: "Familias de posturas", familiesHint: "Tiempo por familia",
+    chakras: "Chakras", chakrasHint: "Referencias tradicionales orientativas", radar: "Radar",
+    footnote: "Intensidad, zonas y chakras son referencias calculadas a partir de las familias y el nivel de las posturas, no mediciones.",
+    curveLabel: "Curva de intensidad de la clase", intensity: "{i}. intensidad {v} / 5", start: "Inicio",
+    left: "Izquierda", right: "Derecha", leftShort: "I", rightShort: "D",
+    neutral: "De frente / sin lado: {a} · A ambos lados: {b}",
+    front: "Frente", back: "Espalda", bodyMap: "Mapa de las zonas trabajadas", chakraRadar: "Radar de chakras",
+    insights: {
+      "unmatched-sides": "{name}: {right} vez/veces a la derecha, {left} a la izquierda.",
+      "above-level": "{n} postura(s) por encima del nivel de la clase.",
+      "intense-start": "El inicio es intenso: prevé un calentamiento más suave.",
+      "no-rest-end": "La clase no termina con una postura de descanso (Savasana…).",
+      "over-target": "La clase supera en {n} min la duración prevista.",
+      "under-target": "Faltan unos {n} min para llegar a la duración prevista.",
+      balanced: "Clase equilibrada: lados, nivel, inicio y final son coherentes.",
+    },
+  },
+};
+
+type Messages = (typeof M)["fr"];
+
+function insightText(t: Messages, ins: Insight): string {
+  const template = t.insights[ins.kind];
+  switch (ins.kind) {
+    case "unmatched-sides":
+      return format(template, { name: ins.pose.name, right: ins.right, left: ins.left });
+    case "above-level":
+      return format(template, { n: ins.count });
+    case "over-target":
+    case "under-target":
+      return format(template, { n: ins.minutes });
+    default:
+      return template;
+  }
 }
 
 const LEVEL_COLOR: Record<Level, string> = { debutant: "var(--accent)", intermediaire: "var(--gold)", avance: "var(--clay)" };
@@ -53,6 +149,9 @@ function Toggle<T extends string>({ value, options, onChange }: { value: T; opti
 }
 
 export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight, onClose }: Props) {
+  const t = useMessages(M);
+  const L = useLabels();
+  const chakraShort = CHAKRA_SHORT[useLocale()];
   const [curveMode, setCurveMode] = useState<"courbe" | "barres">("courbe");
   const [chakraMode, setChakraMode] = useState<"radar" | "barres">("radar");
   const hl = (ids: string[] | null) => () => onHighlight(ids);
@@ -64,26 +163,26 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <h2 className="font-display text-xl font-semibold">Analyse du cours</h2>
-        <button className="icon-btn ml-auto" onClick={onClose} aria-label="Fermer l'analyse">
+        <h2 className="font-display text-xl font-semibold">{t.title}</h2>
+        <button className="icon-btn ml-auto" onClick={onClose} aria-label={t.close}>
           <X size={18} />
         </button>
       </div>
       {a.count === 0 ? (
-        <p className="p-6 text-center text-sm text-muted">Ajoute des postures pour voir l&apos;analyse de ton cours.</p>
+        <p className="p-6 text-center text-sm text-muted">{t.empty}</p>
       ) : (
         <div className="scrollbar-thin flex-1 space-y-3 overflow-y-auto p-4" onMouseLeave={() => onHighlight(null)}>
           <div className="grid grid-cols-3 divide-x divide-line rounded-2xl border border-line bg-surface py-3 text-center">
-            <Kpi value={String(a.count)} label="Postures" />
+            <Kpi value={String(a.count)} label={t.poses} />
             <Kpi
               value={formatDuration(a.total)}
-              label={`sur ${targetMinutes} min`}
+              label={format(t.of, { n: targetMinutes })}
               tone={a.total > targetMinutes * 66 ? "text-danger" : a.total < targetMinutes * 48 ? "text-gold" : undefined}
             />
-            <Kpi value={a.avgLevel.toFixed(1)} label="Niveau moyen" />
+            <Kpi value={a.avgLevel.toFixed(1)} label={t.avgLevel} />
           </div>
 
-          <Card icon={<Sparkle size={16} />} title="Conseils" subtitle="Survole un conseil pour voir les postures concernées">
+          <Card icon={<Sparkle size={16} />} title={t.tips} subtitle={t.tipsHint}>
             <ul className="space-y-1.5">
               {a.insights.map((ins, i) => (
                 <li
@@ -96,7 +195,7 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
                   ) : (
                     <AlertTriangle size={16} className="mt-0.5 shrink-0 text-clay" />
                   )}
-                  {ins.text}
+                  {insightText(t, ins)}
                 </li>
               ))}
             </ul>
@@ -105,22 +204,22 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
           {a.peak?.pose && (
             <Card
               icon={<Crown size={16} />}
-              title="Posture pic"
-              subtitle="Le sommet d'intensité du cours"
+              title={t.peak}
+              subtitle={t.peakHint}
               actions={<span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-bold">#{a.peak.index + 1} / {a.count}</span>}
             >
               <div className="flex items-center gap-3" onMouseEnter={hl([a.peak.item.id])}>
                 <PoseThumb pose={a.peak.pose} size={72} className="rounded-xl" />
                 <div className="min-w-0">
-                  <p className="font-display text-lg leading-tight font-semibold">{a.peak.pose.nameFr}</p>
+                  <p className="font-display text-lg leading-tight font-semibold">{a.peak.pose.name}</p>
                   <p className="truncate text-xs text-muted italic">{a.peak.pose.sanskrit}</p>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-surface" style={{ background: LEVEL_COLOR[a.peak.pose.level] }}>
-                      {LEVEL_LABELS[a.peak.pose.level]}
+                      {L.level[a.peak.pose.level]}
                     </span>
                     {a.peak.pose.categories.slice(0, 3).map((c) => (
                       <span key={c} className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold">
-                        {CATEGORY_LABELS[c]}
+                        {L.category[c]}
                       </span>
                     ))}
                   </div>
@@ -131,21 +230,21 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
 
           <Card
             icon={<Activity size={16} />}
-            title="Dynamique"
-            subtitle={curveMode === "courbe" ? "Intensité au fil du cours" : "Temps passé par niveau"}
+            title={t.dynamics}
+            subtitle={curveMode === "courbe" ? t.curveHint : t.barsHint}
             actions={
               <Toggle
                 value={curveMode}
                 onChange={setCurveMode}
                 options={[
-                  { id: "courbe", icon: <LineChart size={14} />, label: "Courbe" },
-                  { id: "barres", icon: <BarChart3 size={14} />, label: "Barres" },
+                  { id: "courbe", icon: <LineChart size={14} />, label: t.curve },
+                  { id: "barres", icon: <BarChart3 size={14} />, label: t.bars },
                 ]}
               />
             }
           >
             {curveMode === "courbe" ? (
-              <IntensityCurve analysis={a} onHover={(id) => onHighlight(id ? [id] : null)} />
+              <IntensityCurve t={t} analysis={a} onHover={(id) => onHighlight(id ? [id] : null)} />
             ) : (
               <div className="space-y-2">
                 <div className="flex h-3 overflow-hidden rounded-full">
@@ -156,7 +255,7 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
                 {a.levels.map((l) => (
                   <Bar
                     key={l.level}
-                    label={LEVEL_LABELS[l.level]}
+                    label={L.level[l.level]}
                     value={l.seconds / (a.total || 1)}
                     color={LEVEL_COLOR[l.level]}
                     right={`${l.count} · ${formatDuration(Math.round(l.seconds))}`}
@@ -167,27 +266,27 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
             )}
           </Card>
 
-          <Card icon={<Scale size={16} />} title="Équilibre des côtés" subtitle="Temps à gauche et à droite">
-            <SideBalance analysis={a} onEnter={(ids) => onHighlight(ids)} />
+          <Card icon={<Scale size={16} />} title={t.sides} subtitle={t.sidesHint}>
+            <SideBalance t={t} analysis={a} onEnter={(ids) => onHighlight(ids)} />
           </Card>
 
-          <Card icon={<Flame size={16} />} title="Zones sollicitées" subtitle="Estimation d'après les familles de postures">
+          <Card icon={<Flame size={16} />} title={t.zones} subtitle={t.zonesHint}>
             <div className="flex items-center gap-4">
-              <BodyMap zones={a.zones} />
+              <BodyMap t={t} zones={a.zones} />
               <ul className="min-w-0 flex-1 space-y-1.5">
                 {a.zones.slice(0, 6).map((z) => (
-                  <Bar key={z.zone} label={ZONE_LABELS[z.zone]} value={z.score} color="var(--clay)" right={`${Math.round(z.score * 100)} %`} compact />
+                  <Bar key={z.zone} label={L.analyticsZone[z.zone]} value={z.score} color="var(--clay)" right={`${Math.round(z.score * 100)} %`} compact />
                 ))}
               </ul>
             </div>
           </Card>
 
-          <Card icon={<BarChart3 size={16} />} title="Familles de postures" subtitle="Temps passé par famille">
+          <Card icon={<BarChart3 size={16} />} title={t.families} subtitle={t.familiesHint}>
             <div className="space-y-1.5">
               {a.categories.slice(0, 8).map((c) => (
                 <Bar
                   key={c.category}
-                  label={CATEGORY_LABELS[c.category as Category]}
+                  label={L.category[c.category as Category]}
                   value={c.seconds / (a.categories[0]?.seconds || 1)}
                   color="var(--accent)"
                   right={formatDuration(Math.round(c.seconds))}
@@ -199,27 +298,27 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
 
           <Card
             icon={<Hexagon size={16} />}
-            title="Chakras"
-            subtitle="Repères traditionnels indicatifs"
+            title={t.chakras}
+            subtitle={t.chakrasHint}
             actions={
               <Toggle
                 value={chakraMode}
                 onChange={setChakraMode}
                 options={[
-                  { id: "radar", icon: <Hexagon size={14} />, label: "Radar" },
-                  { id: "barres", icon: <BarChart3 size={14} />, label: "Barres" },
+                  { id: "radar", icon: <Hexagon size={14} />, label: t.radar },
+                  { id: "barres", icon: <BarChart3 size={14} />, label: t.bars },
                 ]}
               />
             }
           >
             {chakraMode === "radar" ? (
-              <ChakraRadar chakras={a.chakras} />
+              <ChakraRadar t={t} chakras={a.chakras} short={chakraShort} full={L.chakra} />
             ) : (
               <div className="space-y-1.5">
                 {a.chakras.map((c) => (
                   <Bar
                     key={c.chakra}
-                    label={CHAKRA_SHORT[c.chakra]}
+                    label={chakraShort[c.chakra]}
                     value={c.seconds / (Math.max(...a.chakras.map((x) => x.seconds)) || 1)}
                     color={CHAKRA_COLORS[c.chakra]}
                     right={formatDuration(Math.round(c.seconds))}
@@ -229,7 +328,7 @@ export function AnalyticsPanel({ analysis: a, targetMinutes, poseOf, onHighlight
             )}
           </Card>
           <p className="px-1 pb-2 text-[11px] text-muted">
-            Intensité, zones et chakras sont des repères calculés à partir des familles et du niveau des postures, pas des mesures.
+            {t.footnote}
           </p>
         </div>
       )}
@@ -283,7 +382,7 @@ function Bar({
   );
 }
 
-function IntensityCurve({ analysis: a, onHover }: { analysis: FlowAnalysis; onHover: (itemId: string | null) => void }) {
+function IntensityCurve({ t, analysis: a, onHover }: { t: Messages; analysis: FlowAnalysis; onHover: (itemId: string | null) => void }) {
   const W = 320;
   const H = 120;
   const pad = 6;
@@ -308,7 +407,7 @@ function IntensityCurve({ analysis: a, onHover }: { analysis: FlowAnalysis; onHo
   const peakIdx = a.peak ? a.curve.findIndex((c) => c.itemId === a.peak!.item.id) : -1;
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Courbe d'intensité du cours">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={t.curveLabel}>
         <defs>
           <linearGradient id="intensity-fill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="var(--clay)" stopOpacity="0.35" />
@@ -330,7 +429,7 @@ function IntensityCurve({ analysis: a, onHover }: { analysis: FlowAnalysis; onHo
             fill="transparent"
             onMouseEnter={() => onHover(c.itemId)}
           >
-            <title>{`${i + 1}. intensité ${c.intensity.toFixed(1)} / 5`}</title>
+            <title>{format(t.intensity, { i: i + 1, v: c.intensity.toFixed(1) })}</title>
           </rect>
         ))}
         {peakIdx >= 0 && (
@@ -340,14 +439,14 @@ function IntensityCurve({ analysis: a, onHover }: { analysis: FlowAnalysis; onHo
         )}
       </svg>
       <div className="mt-1 flex justify-between text-[10px] font-semibold text-muted">
-        <span>Début</span>
+        <span>{t.start}</span>
         <span>{formatDuration(a.total)}</span>
       </div>
     </div>
   );
 }
 
-function SideBalance({ analysis: a, onEnter }: { analysis: FlowAnalysis; onEnter: (ids: string[] | null) => void }) {
+function SideBalance({ t, analysis: a, onEnter }: { t: Messages; analysis: FlowAnalysis; onEnter: (ids: string[] | null) => void }) {
   const lr = a.sides.left + a.sides.right || 1;
   const leftPct = Math.round((a.sides.left / lr) * 100);
   return (
@@ -357,22 +456,22 @@ function SideBalance({ analysis: a, onEnter }: { analysis: FlowAnalysis; onEnter
         <div style={{ width: `${100 - leftPct}%`, background: "var(--clay)" }} />
       </div>
       <div className="flex justify-between text-xs font-semibold">
-        <span className="text-lilac">Gauche {leftPct} % · {formatDuration(Math.round(a.sides.left))}</span>
+        <span className="text-lilac">{t.left} {leftPct} % · {formatDuration(Math.round(a.sides.left))}</span>
         <span className="text-clay">
-          {formatDuration(Math.round(a.sides.right))} · {100 - leftPct} % Droite
+          {formatDuration(Math.round(a.sides.right))} · {100 - leftPct} % {t.right}
         </span>
       </div>
       <p className="text-xs text-muted">
-        Face / sans côté : {formatDuration(Math.round(a.sides.none))} · Des deux côtés : {formatDuration(Math.round(a.sides.both))}
+        {format(t.neutral, { a: formatDuration(Math.round(a.sides.none)), b: formatDuration(Math.round(a.sides.both)) })}
       </p>
       {a.unmatched.length > 0 && (
         <ul className="space-y-1">
           {a.unmatched.map((u) => (
             <li key={u.pose.id} onMouseEnter={() => onEnter(u.itemIds)} className="flex items-center gap-2 rounded-xl bg-clay-soft/70 px-2.5 py-1.5 text-xs">
               <AlertTriangle size={14} className="text-clay" />
-              <span className="flex-1 font-semibold">{u.pose.nameFr}</span>
+              <span className="flex-1 font-semibold">{u.pose.name}</span>
               <span>
-                G {u.left} · D {u.right}
+                {t.leftShort} {u.left} · {t.rightShort} {u.right}
               </span>
             </li>
           ))}
@@ -383,7 +482,7 @@ function SideBalance({ analysis: a, onEnter }: { analysis: FlowAnalysis; onEnter
 }
 
 /** Silhouettes schématiques face/dos, zones colorées selon la sollicitation estimée. */
-function BodyMap({ zones }: { zones: FlowAnalysis["zones"] }) {
+function BodyMap({ t, zones }: { t: Messages; zones: FlowAnalysis["zones"] }) {
   const score = Object.fromEntries(zones.map((z) => [z.zone, z.score])) as Record<Zone, number>;
   const fill = (z: Zone) => ({ fill: "var(--clay)", fillOpacity: 0.08 + (score[z] ?? 0) * 0.85 });
   const base = { fill: "var(--surface-2)" };
@@ -409,19 +508,29 @@ function BodyMap({ zones }: { zones: FlowAnalysis["zones"] }) {
       <rect x="20.5" y="98" width="8" height="20" rx="4" style={fill("mollets")} />
       <rect x="31.5" y="98" width="8" height="20" rx="4" style={fill("mollets")} />
       <text x="30" y="128" textAnchor="middle" fontSize="7" fontWeight="700" fill="var(--muted)">
-        {back ? "Dos" : "Face"}
+        {back ? t.back : t.front}
       </text>
     </g>
   );
   return (
-    <svg viewBox="0 0 124 132" className="w-32 shrink-0" role="img" aria-label="Carte des zones sollicitées">
+    <svg viewBox="0 0 124 132" className="w-32 shrink-0" role="img" aria-label={t.bodyMap}>
       {figure(false, 0)}
       {figure(true, 64)}
     </svg>
   );
 }
 
-function ChakraRadar({ chakras }: { chakras: FlowAnalysis["chakras"] }) {
+function ChakraRadar({
+  t,
+  chakras,
+  short,
+  full,
+}: {
+  t: Messages;
+  chakras: FlowAnalysis["chakras"];
+  short: Record<Chakra, string>;
+  full: Record<Chakra, string>;
+}) {
   const size = 220;
   const c = size / 2;
   const r = 78;
@@ -430,7 +539,7 @@ function ChakraRadar({ chakras }: { chakras: FlowAnalysis["chakras"] }) {
   const point = (i: number, v: number) => [c + Math.cos(angle(i)) * r * v, c + Math.sin(angle(i)) * r * v];
   const shape = chakras.map((x, i) => point(i, 0.08 + (x.seconds / max) * 0.92).join(",")).join(" ");
   return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="mx-auto w-full max-w-[260px]" role="img" aria-label="Radar des chakras">
+    <svg viewBox={`0 0 ${size} ${size}`} className="mx-auto w-full max-w-[260px]" role="img" aria-label={t.chakraRadar}>
       {[0.25, 0.5, 0.75, 1].map((k) => (
         <polygon key={k} points={chakras.map((_, i) => point(i, k).join(",")).join(" ")} fill="none" stroke="var(--line)" />
       ))}
@@ -446,9 +555,9 @@ function ChakraRadar({ chakras }: { chakras: FlowAnalysis["chakras"] }) {
           <g key={x.chakra}>
             <circle cx={px} cy={py} r="4.5" fill={CHAKRA_COLORS[x.chakra]} stroke="var(--surface)" strokeWidth="1.5" />
             <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="9.5" fontWeight="700" fill="var(--muted)">
-              {CHAKRA_SHORT[x.chakra]}
+              {short[x.chakra]}
             </text>
-            <title>{CHAKRA_LABELS[x.chakra]}</title>
+            <title>{full[x.chakra]}</title>
           </g>
         );
       })}

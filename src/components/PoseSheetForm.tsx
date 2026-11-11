@@ -1,22 +1,226 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import {
-  CHAKRA_LABELS,
-  DOSHA_LABELS,
-  ELEMENT_LABELS,
-  GUNA_LABELS,
-  KOSHA_LABELS,
-  POSITION_LABELS,
-  SUITABILITY_LABELS,
-  TYPE_LABELS,
-  VAYU_LABELS,
-  type PoseDetails,
-  type Position,
-  type Suitability,
-} from "@/lib/details";
+import type { PoseDetails, Position, Suitability } from "@/lib/details";
+import { useLabels, useMessages } from "@/lib/i18n";
 import type { PoseEdit } from "@/lib/store";
-import { CATEGORY_LABELS, LEVEL_LABELS, type Category, type Level, type Pose } from "@/lib/types";
+import type { Category, Level, Pose } from "@/lib/types";
+
+const M = {
+  fr: {
+    remove: "Retirer",
+    posePlaceholder: "Nom de la posture…",
+    add: "Ajouter",
+    general: "Général",
+    identity: "Identité",
+    name: "Nom",
+    sanskrit: "Nom sanskrit",
+    english: "Nom anglais",
+    iast: "Sanskrit avec diacritiques",
+    pronunciation: "Prononciation",
+    meaning: "Sens du nom",
+    otherNames: "Autres noms",
+    level: "Niveau",
+    position: "Position",
+    typicalHold: "Tenue habituelle",
+    sided: "Se pratique des deux côtés",
+    families: "Familles",
+    type: "Type",
+    overview: "Aperçu",
+    overviewHint: "ce qu'est la posture, ce qu'elle travaille, pour qui",
+    description: "Description courte / placement",
+    guidance: "Guidage",
+    cuesShort: "Consignes courtes",
+    cuesShortHint: "une par ligne, prêtes à dire en cours",
+    cuesDetailed: "Consignes détaillées",
+    cuesDetailedHint: "une par ligne, « Zone : consigne »",
+    breath: "Respiration",
+    mistakes: "Erreurs fréquentes",
+    steps: "Étapes",
+    entry: "Entrer dans la posture",
+    hold: "Pendant la tenue",
+    exit: "Sortir de la posture",
+    benefits: "Bienfaits",
+    benefitsShort: "Bienfaits (liste courte)",
+    benefitsDetailed: "Bienfaits détaillés",
+    benefitsDetailedHint: "un par ligne, « Thème : texte »",
+    therapeutic: "En accompagnement de",
+    therapeuticHint: "un par ligne, formulé prudemment",
+    stretched: "Muscles étirés",
+    strengthened: "Muscles renforcés",
+    precautionsAudience: "Précautions et public",
+    contraShort: "Contre-indications (liste courte)",
+    precautions: "Précautions détaillées",
+    pregnancy: "Grossesse",
+    seniors: "Seniors",
+    children: "Enfants",
+    audienceNote: "Remarque sur le public",
+    modifications: "Adaptations",
+    props: "Accessoires",
+    related: "Postures liées",
+    preparatory: "Pour préparer",
+    counterPoses: "Pour compenser / relâcher",
+    variations: "Variantes",
+    progressions: "Pour progresser",
+    traditional: "Repères traditionnels",
+    chakras: "Chakras",
+    doshas: "Doshas",
+    elements: "Éléments",
+    gunas: "Gunas",
+    vayus: "Vayus",
+    koshas: "Koshas",
+    meridians: "Méridiens",
+    styles: "Styles de yoga",
+    save: "Enregistrer la fiche",
+    cancel: "Annuler",
+    perLineM: "un par ligne",
+    perLineF: "une par ligne",
+    stepPerLine: "une étape par ligne",
+    commaSeparated: "séparés par des virgules",
+  },
+  en: {
+    remove: "Remove",
+    posePlaceholder: "Pose name…",
+    add: "Add",
+    general: "General",
+    identity: "Identity",
+    name: "Name",
+    sanskrit: "Sanskrit name",
+    english: "English name",
+    iast: "Sanskrit with diacritics",
+    pronunciation: "Pronunciation",
+    meaning: "Meaning of the name",
+    otherNames: "Other names",
+    level: "Level",
+    position: "Position",
+    typicalHold: "Typical hold",
+    sided: "Practiced on both sides",
+    families: "Families",
+    type: "Type",
+    overview: "Overview",
+    overviewHint: "what the pose is, what it works, who it's for",
+    description: "Short description / alignment",
+    guidance: "Guidance",
+    cuesShort: "Short cues",
+    cuesShortHint: "one per line, ready to say in class",
+    cuesDetailed: "Detailed cues",
+    cuesDetailedHint: "one per line, “Area: cue”",
+    breath: "Breath",
+    mistakes: "Common mistakes",
+    steps: "Steps",
+    entry: "Entering the pose",
+    hold: "During the hold",
+    exit: "Coming out of the pose",
+    benefits: "Benefits",
+    benefitsShort: "Benefits (short list)",
+    benefitsDetailed: "Detailed benefits",
+    benefitsDetailedHint: "one per line, “Theme: text”",
+    therapeutic: "Supportive for",
+    therapeuticHint: "one per line, worded carefully",
+    stretched: "Muscles stretched",
+    strengthened: "Muscles strengthened",
+    precautionsAudience: "Precautions and audience",
+    contraShort: "Contraindications (short list)",
+    precautions: "Detailed precautions",
+    pregnancy: "Pregnancy",
+    seniors: "Seniors",
+    children: "Children",
+    audienceNote: "Note on the audience",
+    modifications: "Modifications",
+    props: "Props",
+    related: "Related poses",
+    preparatory: "To prepare",
+    counterPoses: "To counter / release",
+    variations: "Variations",
+    progressions: "To progress",
+    traditional: "Traditional references",
+    chakras: "Chakras",
+    doshas: "Doshas",
+    elements: "Elements",
+    gunas: "Gunas",
+    vayus: "Vayus",
+    koshas: "Koshas",
+    meridians: "Meridians",
+    styles: "Yoga styles",
+    save: "Save pose sheet",
+    cancel: "Cancel",
+    perLineM: "one per line",
+    perLineF: "one per line",
+    stepPerLine: "one step per line",
+    commaSeparated: "comma-separated",
+  },
+  es: {
+    remove: "Quitar",
+    posePlaceholder: "Nombre de la postura…",
+    add: "Añadir",
+    general: "General",
+    identity: "Identidad",
+    name: "Nombre",
+    sanskrit: "Nombre en sánscrito",
+    english: "Nombre en inglés",
+    iast: "Sánscrito con diacríticos",
+    pronunciation: "Pronunciación",
+    meaning: "Significado del nombre",
+    otherNames: "Otros nombres",
+    level: "Nivel",
+    position: "Posición",
+    typicalHold: "Permanencia habitual",
+    sided: "Se practica en ambos lados",
+    families: "Familias",
+    type: "Tipo",
+    overview: "Resumen",
+    overviewHint: "qué es la postura, qué trabaja, para quién",
+    description: "Descripción breve / alineación",
+    guidance: "Guía",
+    cuesShort: "Indicaciones breves",
+    cuesShortHint: "una por línea, listas para decir en clase",
+    cuesDetailed: "Indicaciones detalladas",
+    cuesDetailedHint: "una por línea, «Zona: indicación»",
+    breath: "Respiración",
+    mistakes: "Errores frecuentes",
+    steps: "Pasos",
+    entry: "Entrar en la postura",
+    hold: "Durante la permanencia",
+    exit: "Salir de la postura",
+    benefits: "Beneficios",
+    benefitsShort: "Beneficios (lista breve)",
+    benefitsDetailed: "Beneficios detallados",
+    benefitsDetailedHint: "uno por línea, «Tema: texto»",
+    therapeutic: "Como apoyo en",
+    therapeuticHint: "uno por línea, formulado con prudencia",
+    stretched: "Músculos estirados",
+    strengthened: "Músculos fortalecidos",
+    precautionsAudience: "Precauciones y público",
+    contraShort: "Contraindicaciones (lista breve)",
+    precautions: "Precauciones detalladas",
+    pregnancy: "Embarazo",
+    seniors: "Personas mayores",
+    children: "Niños",
+    audienceNote: "Nota sobre el público",
+    modifications: "Adaptaciones",
+    props: "Accesorios",
+    related: "Posturas relacionadas",
+    preparatory: "Para preparar",
+    counterPoses: "Para compensar / soltar",
+    variations: "Variantes",
+    progressions: "Para progresar",
+    traditional: "Referencias tradicionales",
+    chakras: "Chakras",
+    doshas: "Doshas",
+    elements: "Elementos",
+    gunas: "Gunas",
+    vayus: "Vayus",
+    koshas: "Koshas",
+    meridians: "Meridianos",
+    styles: "Estilos de yoga",
+    save: "Guardar la ficha",
+    cancel: "Cancelar",
+    perLineM: "uno por línea",
+    perLineF: "una por línea",
+    stepPerLine: "un paso por línea",
+    commaSeparated: "separados por comas",
+  },
+};
 
 // ——— helpers: lists are edited as one item per line ———
 const toLines = (xs?: string[]) => (xs ?? []).join("\n");
@@ -79,14 +283,15 @@ function Chips<T extends string>({ label, map, value, onChange }: { label: strin
   );
 }
 function Suit({ label, value, onChange }: { label: string; value?: Suitability; onChange: (v?: Suitability) => void }) {
+  const L = useLabels();
   return (
     <label className="text-sm">
       {label}
       <select className="input mt-1" value={value ?? ""} onChange={(e) => onChange((e.target.value || undefined) as Suitability | undefined)}>
         <option value="">—</option>
-        {(Object.keys(SUITABILITY_LABELS) as Suitability[]).map((k) => (
+        {(Object.keys(L.suitability) as Suitability[]).map((k) => (
           <option key={k} value={k}>
-            {SUITABILITY_LABELS[k]}
+            {L.suitability[k]}
           </option>
         ))}
       </select>
@@ -96,8 +301,9 @@ function Suit({ label, value, onChange }: { label: string; value?: Suitability; 
 
 /** Pick related poses by name. */
 function PoseLinks({ label, ids, onChange, poses, selfId }: { label: string; ids: string[]; onChange: (ids: string[]) => void; poses: Pose[]; selfId: string }) {
+  const t = useMessages(M);
   const [q, setQ] = useState("");
-  const byName = new Map(poses.map((p) => [p.nameFr.toLowerCase(), p]));
+  const byName = new Map(poses.map((p) => [p.name.toLowerCase(), p]));
   const byId = new Map(poses.map((p) => [p.id, p]));
   const add = () => {
     const p = byName.get(q.trim().toLowerCase());
@@ -111,8 +317,8 @@ function PoseLinks({ label, ids, onChange, poses, selfId }: { label: string; ids
       <div className="mb-1 flex flex-wrap gap-1.5">
         {ids.map((id) => (
           <span key={id} className="chip flex items-center gap-1" data-active>
-            {byId.get(id)?.nameFr ?? id}
-            <button type="button" aria-label="Retirer" onClick={() => onChange(ids.filter((x) => x !== id))}>
+            {byId.get(id)?.name ?? id}
+            <button type="button" aria-label={t.remove} onClick={() => onChange(ids.filter((x) => x !== id))}>
               ✕
             </button>
           </span>
@@ -122,18 +328,18 @@ function PoseLinks({ label, ids, onChange, poses, selfId }: { label: string; ids
         <input
           className="input"
           list={listId}
-          placeholder="Nom de la posture…"
+          placeholder={t.posePlaceholder}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), add())}
         />
         <button type="button" className="btn" onClick={add}>
-          Ajouter
+          {t.add}
         </button>
       </div>
       <datalist id={listId}>
         {poses.map((p) => (
-          <option key={p.id} value={p.nameFr} />
+          <option key={p.id} value={p.name} />
         ))}
       </datalist>
     </div>
@@ -160,6 +366,8 @@ export function diffEdit(base: Pose, next: Pose): PoseEdit {
 }
 
 export function PoseSheetForm({ pose, poses, onSave, onCancel }: { pose: Pose; poses: Pose[]; onSave: (next: Pose) => void; onCancel: () => void }) {
+  const t = useMessages(M);
+  const L = useLabels();
   const d = pose.details ?? {};
   const [f, setF] = useState({
     nameFr: pose.nameFr,
@@ -224,10 +432,10 @@ export function PoseSheetForm({ pose, poses, onSave, onCancel }: { pose: Pose; p
       typicalHold: f.typicalHold.trim(),
       steps: clean({ entry: fromLines(f.entry), hold: fromLines(f.hold), exit: fromLines(f.exit) }),
       cuesShort: fromLines(f.cuesShort),
-      cuesDetailed: fromPairs(f.cuesDetailed).map(({ a, b }) => ({ zone: a || "Général", cue: b })),
+      cuesDetailed: fromPairs(f.cuesDetailed).map(({ a, b }) => ({ zone: a || t.general, cue: b })),
       breath: f.breath.trim(),
       commonMistakes: fromLines(f.commonMistakes),
-      benefitsDetailed: fromPairs(f.benefitsDetailed).map(({ a, b }) => ({ theme: a || "Général", text: b })),
+      benefitsDetailed: fromPairs(f.benefitsDetailed).map(({ a, b }) => ({ theme: a || t.general, text: b })),
       therapeutic: fromLines(f.therapeutic),
       muscles: clean({ stretched: fromCsv(f.stretched), strengthened: fromCsv(f.strengthened) }),
       precautions: f.precautions.trim(),
@@ -271,113 +479,113 @@ export function PoseSheetForm({ pose, poses, onSave, onCancel }: { pose: Pose; p
         submit();
       }}
     >
-      <Fieldset title="Identité">
+      <Fieldset title={t.identity}>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Text label="Nom français" value={f.nameFr} onChange={set("nameFr")} />
-          <Text label="Nom sanskrit" value={f.sanskrit} onChange={set("sanskrit")} />
-          <Text label="Nom anglais" value={f.nameEn} onChange={set("nameEn")} />
-          <Text label="Sanskrit avec diacritiques" value={f.sanskritIast} onChange={set("sanskritIast")} />
-          <Text label="Prononciation" value={f.pronunciation} onChange={set("pronunciation")} />
-          <Text label="Sens du nom" value={f.sanskritMeaning} onChange={set("sanskritMeaning")} />
+          <Text label={t.name} value={f.nameFr} onChange={set("nameFr")} />
+          <Text label={t.sanskrit} value={f.sanskrit} onChange={set("sanskrit")} />
+          <Text label={t.english} value={f.nameEn} onChange={set("nameEn")} />
+          <Text label={t.iast} value={f.sanskritIast} onChange={set("sanskritIast")} />
+          <Text label={t.pronunciation} value={f.pronunciation} onChange={set("pronunciation")} />
+          <Text label={t.meaning} value={f.sanskritMeaning} onChange={set("sanskritMeaning")} />
         </div>
-        <Text label="Autres noms" hint="un par ligne" rows={2} value={f.otherNames} onChange={set("otherNames")} />
+        <Text label={t.otherNames} hint={t.perLineM} rows={2} value={f.otherNames} onChange={set("otherNames")} />
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="text-sm">
-            Niveau
+            {t.level}
             <select className="input mt-1" value={f.level} onChange={(e) => set("level")(e.target.value as Level)}>
-              {(Object.keys(LEVEL_LABELS) as Level[]).map((l) => (
-                <option key={l} value={l}>{LEVEL_LABELS[l]}</option>
+              {(Object.keys(L.level) as Level[]).map((l) => (
+                <option key={l} value={l}>{L.level[l]}</option>
               ))}
             </select>
           </label>
           <label className="text-sm">
-            Position
+            {t.position}
             <select className="input mt-1" value={f.position} onChange={(e) => set("position")(e.target.value as Position)}>
               <option value="">—</option>
-              {(Object.keys(POSITION_LABELS) as Position[]).map((k) => (
-                <option key={k} value={k}>{POSITION_LABELS[k]}</option>
+              {(Object.keys(L.position) as Position[]).map((k) => (
+                <option key={k} value={k}>{L.position[k]}</option>
               ))}
             </select>
           </label>
-          <Text label="Tenue habituelle" value={f.typicalHold} onChange={set("typicalHold")} />
+          <Text label={t.typicalHold} value={f.typicalHold} onChange={set("typicalHold")} />
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={f.sided} onChange={(e) => set("sided")(e.target.checked)} /> Se pratique des deux côtés
+          <input type="checkbox" checked={f.sided} onChange={(e) => set("sided")(e.target.checked)} /> {t.sided}
         </label>
-        <Chips label="Familles" map={CATEGORY_LABELS} value={f.categories} onChange={(v) => set("categories")(v as Category[])} />
-        <Chips label="Type" map={TYPE_LABELS} value={f.types} onChange={set("types")} />
+        <Chips label={t.families} map={L.category} value={f.categories} onChange={(v) => set("categories")(v as Category[])} />
+        <Chips label={t.type} map={L.type} value={f.types} onChange={set("types")} />
       </Fieldset>
 
-      <Fieldset title="Aperçu">
-        <Text label="Aperçu" hint="ce qu'est la posture, ce qu'elle travaille, pour qui" rows={4} value={f.summary} onChange={set("summary")} />
-        <Text label="Description courte / placement" rows={2} value={f.description} onChange={set("description")} />
+      <Fieldset title={t.overview}>
+        <Text label={t.overview} hint={t.overviewHint} rows={4} value={f.summary} onChange={set("summary")} />
+        <Text label={t.description} rows={2} value={f.description} onChange={set("description")} />
       </Fieldset>
 
-      <Fieldset title="Guidage">
-        <Text label="Consignes courtes" hint="une par ligne, prêtes à dire en cours" rows={4} value={f.cuesShort} onChange={set("cuesShort")} />
-        <Text label="Consignes détaillées" hint="une par ligne, « Zone : consigne »" rows={6} value={f.cuesDetailed} onChange={set("cuesDetailed")} />
-        <Text label="Respiration" rows={2} value={f.breath} onChange={set("breath")} />
-        <Text label="Erreurs fréquentes" hint="une par ligne" rows={3} value={f.commonMistakes} onChange={set("commonMistakes")} />
+      <Fieldset title={t.guidance}>
+        <Text label={t.cuesShort} hint={t.cuesShortHint} rows={4} value={f.cuesShort} onChange={set("cuesShort")} />
+        <Text label={t.cuesDetailed} hint={t.cuesDetailedHint} rows={6} value={f.cuesDetailed} onChange={set("cuesDetailed")} />
+        <Text label={t.breath} rows={2} value={f.breath} onChange={set("breath")} />
+        <Text label={t.mistakes} hint={t.perLineF} rows={3} value={f.commonMistakes} onChange={set("commonMistakes")} />
       </Fieldset>
 
-      <Fieldset title="Étapes">
-        <Text label="Entrer dans la posture" hint="une étape par ligne" rows={4} value={f.entry} onChange={set("entry")} />
-        <Text label="Pendant la tenue" hint="une par ligne" rows={3} value={f.hold} onChange={set("hold")} />
-        <Text label="Sortir de la posture" hint="une étape par ligne" rows={3} value={f.exit} onChange={set("exit")} />
+      <Fieldset title={t.steps}>
+        <Text label={t.entry} hint={t.stepPerLine} rows={4} value={f.entry} onChange={set("entry")} />
+        <Text label={t.hold} hint={t.perLineF} rows={3} value={f.hold} onChange={set("hold")} />
+        <Text label={t.exit} hint={t.stepPerLine} rows={3} value={f.exit} onChange={set("exit")} />
       </Fieldset>
 
-      <Fieldset title="Bienfaits">
-        <Text label="Bienfaits (liste courte)" hint="un par ligne" rows={3} value={f.benefits} onChange={set("benefits")} />
-        <Text label="Bienfaits détaillés" hint="un par ligne, « Thème : texte »" rows={5} value={f.benefitsDetailed} onChange={set("benefitsDetailed")} />
-        <Text label="En accompagnement de" hint="un par ligne, formulé prudemment" rows={3} value={f.therapeutic} onChange={set("therapeutic")} />
+      <Fieldset title={t.benefits}>
+        <Text label={t.benefitsShort} hint={t.perLineM} rows={3} value={f.benefits} onChange={set("benefits")} />
+        <Text label={t.benefitsDetailed} hint={t.benefitsDetailedHint} rows={5} value={f.benefitsDetailed} onChange={set("benefitsDetailed")} />
+        <Text label={t.therapeutic} hint={t.therapeuticHint} rows={3} value={f.therapeutic} onChange={set("therapeutic")} />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Text label="Muscles étirés" hint="séparés par des virgules" value={f.stretched} onChange={set("stretched")} />
-          <Text label="Muscles renforcés" hint="séparés par des virgules" value={f.strengthened} onChange={set("strengthened")} />
+          <Text label={t.stretched} hint={t.commaSeparated} value={f.stretched} onChange={set("stretched")} />
+          <Text label={t.strengthened} hint={t.commaSeparated} value={f.strengthened} onChange={set("strengthened")} />
         </div>
       </Fieldset>
 
-      <Fieldset title="Précautions et public">
-        <Text label="Contre-indications (liste courte)" hint="une par ligne" rows={3} value={f.contraindications} onChange={set("contraindications")} />
-        <Text label="Précautions détaillées" rows={3} value={f.precautions} onChange={set("precautions")} />
+      <Fieldset title={t.precautionsAudience}>
+        <Text label={t.contraShort} hint={t.perLineF} rows={3} value={f.contraindications} onChange={set("contraindications")} />
+        <Text label={t.precautions} rows={3} value={f.precautions} onChange={set("precautions")} />
         <div className="grid gap-3 sm:grid-cols-3">
-          <Suit label="Grossesse" value={f.pregnancy} onChange={set("pregnancy")} />
-          <Suit label="Seniors" value={f.seniors} onChange={set("seniors")} />
-          <Suit label="Enfants" value={f.children} onChange={set("children")} />
+          <Suit label={t.pregnancy} value={f.pregnancy} onChange={set("pregnancy")} />
+          <Suit label={t.seniors} value={f.seniors} onChange={set("seniors")} />
+          <Suit label={t.children} value={f.children} onChange={set("children")} />
         </div>
-        <Text label="Remarque sur le public" value={f.audienceNote} onChange={set("audienceNote")} />
+        <Text label={t.audienceNote} value={f.audienceNote} onChange={set("audienceNote")} />
       </Fieldset>
 
-      <Fieldset title="Adaptations">
-        <Text label="Adaptations" hint="une par ligne" rows={3} value={f.modifications} onChange={set("modifications")} />
-        <Text label="Accessoires" hint="séparés par des virgules" value={f.props} onChange={set("props")} />
+      <Fieldset title={t.modifications}>
+        <Text label={t.modifications} hint={t.perLineF} rows={3} value={f.modifications} onChange={set("modifications")} />
+        <Text label={t.props} hint={t.commaSeparated} value={f.props} onChange={set("props")} />
       </Fieldset>
 
-      <Fieldset title="Postures liées">
-        <PoseLinks label="Pour préparer" ids={f.preparatory} onChange={set("preparatory")} poses={others} selfId={pose.id} />
-        <PoseLinks label="Pour compenser / relâcher" ids={f.counterPoses} onChange={set("counterPoses")} poses={others} selfId={pose.id} />
-        <PoseLinks label="Variantes" ids={f.variations} onChange={set("variations")} poses={others} selfId={pose.id} />
-        <PoseLinks label="Pour progresser" ids={f.progressions} onChange={set("progressions")} poses={others} selfId={pose.id} />
+      <Fieldset title={t.related}>
+        <PoseLinks label={t.preparatory} ids={f.preparatory} onChange={set("preparatory")} poses={others} selfId={pose.id} />
+        <PoseLinks label={t.counterPoses} ids={f.counterPoses} onChange={set("counterPoses")} poses={others} selfId={pose.id} />
+        <PoseLinks label={t.variations} ids={f.variations} onChange={set("variations")} poses={others} selfId={pose.id} />
+        <PoseLinks label={t.progressions} ids={f.progressions} onChange={set("progressions")} poses={others} selfId={pose.id} />
       </Fieldset>
 
-      <Fieldset title="Repères traditionnels">
-        <Chips label="Chakras" map={CHAKRA_LABELS} value={f.chakras} onChange={set("chakras")} />
-        <Chips label="Doshas" map={DOSHA_LABELS} value={f.doshas} onChange={set("doshas")} />
-        <Chips label="Éléments" map={ELEMENT_LABELS} value={f.elements} onChange={set("elements")} />
-        <Chips label="Gunas" map={GUNA_LABELS} value={f.gunas} onChange={set("gunas")} />
-        <Chips label="Vayus" map={VAYU_LABELS} value={f.vayus} onChange={set("vayus")} />
-        <Chips label="Koshas" map={KOSHA_LABELS} value={f.koshas} onChange={set("koshas")} />
+      <Fieldset title={t.traditional}>
+        <Chips label={t.chakras} map={L.chakra} value={f.chakras} onChange={set("chakras")} />
+        <Chips label={t.doshas} map={L.dosha} value={f.doshas} onChange={set("doshas")} />
+        <Chips label={t.elements} map={L.element} value={f.elements} onChange={set("elements")} />
+        <Chips label={t.gunas} map={L.guna} value={f.gunas} onChange={set("gunas")} />
+        <Chips label={t.vayus} map={L.vayu} value={f.vayus} onChange={set("vayus")} />
+        <Chips label={t.koshas} map={L.kosha} value={f.koshas} onChange={set("koshas")} />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Text label="Méridiens" hint="séparés par des virgules" value={f.meridians} onChange={set("meridians")} />
-          <Text label="Styles de yoga" hint="séparés par des virgules" value={f.styles} onChange={set("styles")} />
+          <Text label={t.meridians} hint={t.commaSeparated} value={f.meridians} onChange={set("meridians")} />
+          <Text label={t.styles} hint={t.commaSeparated} value={f.styles} onChange={set("styles")} />
         </div>
       </Fieldset>
 
       <div className="sticky bottom-0 flex gap-2 border-t border-line bg-background py-3">
         <button type="submit" className="btn-primary">
-          Enregistrer la fiche
+          {t.save}
         </button>
         <button type="button" className="btn" onClick={onCancel}>
-          Annuler
+          {t.cancel}
         </button>
       </div>
     </form>

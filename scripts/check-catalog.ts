@@ -6,11 +6,18 @@
 import { FAMILIES } from "../src/lib/catalog/families";
 import { DETAILS } from "../src/lib/catalog/details";
 import { FIGURES } from "../src/lib/catalog/figures";
-import { CHAKRA_LABELS, POSITION_LABELS, TYPE_LABELS } from "../src/lib/details";
 import { POSE_IMAGES } from "../src/lib/catalog/pose-images";
 import { BUILTIN_SEQUENCES } from "../src/lib/sequences";
 import { TEMPLATES } from "../src/lib/templates";
-import { CATEGORY_LABELS, LEVEL_LABELS } from "../src/lib/types";
+import { LABELS } from "../src/lib/labels";
+
+const { category: CATEGORY_LABELS, level: LEVEL_LABELS, position: POSITION_LABELS, type: TYPE_LABELS, chakra: CHAKRA_LABELS } = LABELS.fr;
+import { buildCatalog } from "../src/lib/poses";
+import type { LocaleContent } from "../src/lib/catalog/localize";
+import { LOCALES } from "../src/lib/locale";
+import FR from "../src/lib/catalog/locales/fr.json";
+import EN from "../src/lib/catalog/locales/en.json";
+import ES from "../src/lib/catalog/locales/es.json";
 
 const problems: string[] = [];
 const all = Object.entries(FAMILIES).flatMap(([family, poses]) => poses.map((p) => ({ ...p, family })));
@@ -49,6 +56,28 @@ for (const t of TEMPLATES)
   for (const s of t.sections) for (const [id] of s.steps) if (!seen.has(id)) problems.push(`modèle « ${t.id} » : posture inconnue ${id}`);
 for (const q of BUILTIN_SEQUENCES)
   for (const [id] of q.steps) if (!seen.has(id)) problems.push(`enchaînement « ${q.id} » : posture inconnue ${id}`);
+
+// Catalogue complet (fait main + importé), dans chaque langue.
+const CONTENT = { fr: FR, en: EN, es: ES } as unknown as Record<(typeof LOCALES)[number], LocaleContent>;
+for (const locale of LOCALES) {
+  const catalog = buildCatalog(locale, CONTENT[locale]);
+  const ids = new Set<string>();
+  let untranslated = 0;
+  for (const p of catalog) {
+    if (ids.has(p.id)) problems.push(`[${locale}] id en double : ${p.id}`);
+    ids.add(p.id);
+    if (!p.name) problems.push(`[${locale}] sans nom : ${p.id}`);
+    if (p.imported && locale !== "en" && p.name === p.nameEn) untranslated++;
+    if (!p.categories.length || !p.benefits.length) problems.push(`[${locale}] texte incomplet : ${p.id}`);
+  }
+  for (const p of catalog) {
+    if (p.variantOf && !ids.has(p.variantOf)) problems.push(`[${locale}] variante de posture inconnue : ${p.id} → ${p.variantOf}`);
+    for (const l of [...(p.details?.oftenBefore ?? []), ...(p.details?.oftenAfter ?? [])])
+      if (!ids.has(l.id)) problems.push(`[${locale}] enchaînement vers posture inconnue : ${p.id} → ${l.id}`);
+  }
+  const variants = catalog.filter((p) => p.variantOf).length;
+  console.log({ locale, total: catalog.length, importees: catalog.filter((p) => p.imported).length, variants, nomsNonTraduits: untranslated });
+}
 
 const counts = Object.fromEntries(Object.entries(FAMILIES).map(([f, ps]) => [f, ps.length]));
 const withImage = all.filter((p) => POSE_IMAGES[p.id]).length;

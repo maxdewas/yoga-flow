@@ -5,8 +5,27 @@ import { useParams } from "next/navigation";
 import { PoseThumb } from "@/components/PoseThumb";
 import { formatDuration, formatHold, planSeconds, sectionSeconds } from "@/lib/duration";
 import { useHydrated, usePoseMap, useStore, type PrintPrefs } from "@/lib/store";
-import { BREATH_LABELS, LEVEL_LABELS, SIDE_LABELS } from "@/lib/types";
+import { useLabels, useMessages, useLocale, type Locale } from "@/lib/i18n";
+import type { Labels } from "@/lib/labels";
 import type { ClassPlan, Pose, Section, SequenceItem } from "@/lib/types";
+
+const M = {
+  fr: {
+    untitled: "Cours sans titre", deleted: "Posture supprimée", notFound: "Cours introuvable.", back: "← Retour à l'éditeur",
+    layout: "Mise en page", grid: "Grille (paysage)", list: "Liste (portrait)", perPage: "Postures par page",
+    images: "Images", cues: "Consignes", print: "Imprimer / Enregistrer en PDF", empty: "Ce cours ne contient encore aucune posture.",
+  },
+  en: {
+    untitled: "Untitled class", deleted: "Deleted pose", notFound: "Class not found.", back: "← Back to the editor",
+    layout: "Layout", grid: "Grid (landscape)", list: "List (portrait)", perPage: "Poses per page",
+    images: "Images", cues: "Cues", print: "Print / Save as PDF", empty: "This class has no poses yet.",
+  },
+  es: {
+    untitled: "Clase sin título", deleted: "Postura eliminada", notFound: "Clase no encontrada.", back: "← Volver al editor",
+    layout: "Diseño", grid: "Cuadrícula (horizontal)", list: "Lista (vertical)", perPage: "Posturas por página",
+    images: "Imágenes", cues: "Indicaciones", print: "Imprimir / Guardar como PDF", empty: "Esta clase aún no tiene posturas.",
+  },
+};
 
 /** Poses per landscape page → [columns, rows] on an A4 sheet. */
 const GRIDS: Record<number, [number, number]> = {
@@ -30,11 +49,11 @@ interface Entry {
   firstOfSection: boolean;
 }
 
-function details(item: SequenceItem) {
+function details(item: SequenceItem, L: Labels, locale: Locale) {
   return [
-    formatHold(item),
-    item.side !== "aucun" && SIDE_LABELS[item.side],
-    item.breath && item.breath !== "aucun" && BREATH_LABELS[item.breath],
+    formatHold(item, locale),
+    item.side !== "aucun" && L.side[item.side],
+    item.breath && item.breath !== "aucun" && L.breath[item.breath],
   ]
     .filter(Boolean)
     .join(" · ");
@@ -58,6 +77,9 @@ function GridCard({
   showSection: boolean;
 }) {
   const { item, number, section } = entry;
+  const t = useMessages(M);
+  const L = useLabels();
+  const locale = useLocale();
   return (
     // Spans an image track and a text track of the page grid (subgrid): text blocks of a row line up,
     // and all image tracks share the remaining height equally, whatever the length of each name.
@@ -69,10 +91,10 @@ function GridCard({
         )}
         {/* The name is never cut. */}
         <p className={`leading-tight font-semibold ${dense ? "text-[9pt]" : "text-[11pt]"}`}>
-          <span className="text-muted">{number}.</span> {pose?.nameFr ?? "Posture supprimée"}
+          <span className="text-muted">{number}.</span> {pose?.name ?? t.deleted}
         </p>
         {pose?.sanskrit && <p className="truncate text-[8pt] text-muted italic">{pose.sanskrit}</p>}
-        <p className="truncate text-[8pt] text-muted">{details(item)}</p>
+        <p className="truncate text-[8pt] text-muted">{details(item, L, locale)}</p>
         {prefs.cues && item.cue && (
           <p className={`mt-[0.5mm] text-[8pt] ${compact ? "line-clamp-1" : "line-clamp-2"}`}>{item.cue}</p>
         )}
@@ -84,11 +106,13 @@ function GridCard({
 /** Landscape A4 sheets, `perPage` pose cards each. The sheet has the page's exact size, so the preview is the print. */
 function GridLayout({ plan, entries, prefs }: { plan: ClassPlan; entries: Entry[]; prefs: PrintPrefs }) {
   const poseMap = usePoseMap();
+  const t = useMessages(M);
+  const L = useLabels();
   const perPage = GRIDS[prefs.perPage] ? prefs.perPage : DEFAULT_PER_PAGE;
   const [cols, rows] = GRIDS[perPage];
   const pages: Entry[][] = [];
   for (let i = 0; i < entries.length; i += perPage) pages.push(entries.slice(i, i + perPage));
-  const meta = [plan.theme, LEVEL_LABELS[plan.level], `≈ ${formatDuration(planSeconds(plan))}`].filter(Boolean).join(" · ");
+  const meta = [plan.theme, L.level[plan.level], `≈ ${formatDuration(planSeconds(plan))}`].filter(Boolean).join(" · ");
 
   return pages.map((page, pageIndex) => (
     <div
@@ -97,7 +121,7 @@ function GridLayout({ plan, entries, prefs }: { plan: ClassPlan; entries: Entry[
       className="paper mx-auto mb-6 flex h-[209mm] w-[297mm] flex-col overflow-hidden p-[10mm] shadow-lift break-after-page last:break-after-auto print:mb-0 print:shadow-none"
     >
       <header className="mb-[4mm] flex shrink-0 items-baseline gap-[4mm] border-b border-line pb-[2mm]">
-        <h1 className="truncate font-display text-[16pt] leading-tight font-semibold">{plan.title || "Cours sans titre"}</h1>
+        <h1 className="truncate font-display text-[16pt] leading-tight font-semibold">{plan.title || t.untitled}</h1>
         <span className="truncate text-[9pt] text-muted">{meta}</span>
         {pages.length > 1 && (
           <span className="ml-auto shrink-0 text-[9pt] text-muted">
@@ -133,13 +157,16 @@ function GridLayout({ plan, entries, prefs }: { plan: ClassPlan; entries: Entry[
 /** Portrait list with sections, intention and notes. */
 function ListLayout({ plan, prefs }: { plan: ClassPlan; prefs: PrintPrefs }) {
   const poseMap = usePoseMap();
+  const t = useMessages(M);
+  const L = useLabels();
+  const locale = useLocale();
   const offsets = plan.sections.map((_, i) => plan.sections.slice(0, i).reduce((n, s) => n + s.items.length, 0));
   return (
     <div className="paper mx-auto max-w-3xl rounded-xl p-8 shadow-lift print:rounded-none print:p-0 print:shadow-none">
       <header className="mb-5 border-b border-line pb-3">
         <h1 className="font-display text-3xl font-semibold">{plan.title}</h1>
         <p className="text-sm text-muted">
-          {[plan.theme, LEVEL_LABELS[plan.level], `≈ ${formatDuration(planSeconds(plan))}`].filter(Boolean).join(" · ")}
+          {[plan.theme, L.level[plan.level], `≈ ${formatDuration(planSeconds(plan))}`].filter(Boolean).join(" · ")}
         </p>
         {plan.intention && <p className="mt-2 italic">{plan.intention}</p>}
         {plan.notes && <p className="mt-2 text-sm whitespace-pre-line">{plan.notes}</p>}
@@ -160,10 +187,10 @@ function ListLayout({ plan, prefs }: { plan: ClassPlan; prefs: PrintPrefs }) {
                   {prefs.images && pose && <PoseThumb pose={pose} size={48} eager />}
                   <div className="flex-1">
                     <p>
-                      <strong>{pose?.nameFr ?? "Posture supprimée"}</strong>{" "}
+                      <strong>{pose?.name ?? t.deleted}</strong>{" "}
                       <span className="text-sm text-muted italic">{pose?.sanskrit}</span>
                     </p>
-                    <p className="text-sm text-muted">{details(item)}</p>
+                    <p className="text-sm text-muted">{details(item, L, locale)}</p>
                     {prefs.cues && item.cue && <p className="text-sm whitespace-pre-line">{item.cue}</p>}
                   </div>
                 </li>
@@ -182,10 +209,11 @@ export default function PrintPage() {
   const plan = useStore((s) => s.plans.find((p) => p.id === id));
   const prefs = useStore((s) => s.prefs.print);
   const setPrefs = useStore((s) => s.setPrefs);
+  const t = useMessages(M);
   const setPrint = (patch: Partial<PrintPrefs>) => setPrefs({ print: patch });
 
   if (!hydrated) return null;
-  if (!plan) return <p className="p-6">Cours introuvable.</p>;
+  if (!plan) return <p className="p-6">{t.notFound}</p>;
 
   const grid = prefs.layout === "grille";
   let number = 0;
@@ -203,19 +231,19 @@ export default function PrintPage() {
 
       <div className="no-print mx-auto mb-6 flex max-w-[297mm] flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 text-sm">
         <Link href={`/cours/${plan.id}`} className="btn">
-          ← Retour à l&apos;éditeur
+          {t.back}
         </Link>
-        <div className="flex rounded-full bg-surface-2 p-0.5" role="group" aria-label="Mise en page">
+        <div className="flex rounded-full bg-surface-2 p-0.5" role="group" aria-label={t.layout}>
           <button type="button" className={segment(grid)} aria-pressed={grid} onClick={() => setPrint({ layout: "grille" })}>
-            Grille (paysage)
+            {t.grid}
           </button>
           <button type="button" className={segment(!grid)} aria-pressed={!grid} onClick={() => setPrint({ layout: "liste" })}>
-            Liste (portrait)
+            {t.list}
           </button>
         </div>
         {grid && (
           <label className="flex items-center gap-1.5">
-            Postures par page
+            {t.perPage}
             <select
               className="rounded-lg border border-line bg-surface px-2 py-1"
               value={GRIDS[prefs.perPage] ? prefs.perPage : DEFAULT_PER_PAGE}
@@ -230,18 +258,18 @@ export default function PrintPage() {
           </label>
         )}
         <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={prefs.images} onChange={(e) => setPrint({ images: e.target.checked })} /> Images
+          <input type="checkbox" checked={prefs.images} onChange={(e) => setPrint({ images: e.target.checked })} /> {t.images}
         </label>
         <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={prefs.cues} onChange={(e) => setPrint({ cues: e.target.checked })} /> Consignes
+          <input type="checkbox" checked={prefs.cues} onChange={(e) => setPrint({ cues: e.target.checked })} /> {t.cues}
         </label>
         <button className="btn-primary ml-auto" onClick={() => window.print()}>
-          Imprimer / Enregistrer en PDF
+          {t.print}
         </button>
       </div>
 
       {entries.length === 0 ? (
-        <p className="text-center text-muted">Ce cours ne contient encore aucune posture.</p>
+        <p className="text-center text-muted">{t.empty}</p>
       ) : grid ? (
         <GridLayout plan={plan} entries={entries} prefs={prefs} />
       ) : (

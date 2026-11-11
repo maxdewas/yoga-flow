@@ -51,35 +51,128 @@ import { MenuItem, Popover } from "@/components/ui/Popover";
 import { Toast, useToast } from "@/components/ui/Toast";
 import { analyzeFlow } from "@/lib/analytics";
 import { formatDuration, planSeconds, sectionSeconds } from "@/lib/duration";
-import { generatePlan, suggestNext } from "@/lib/generator";
+import { generatePlan, isAutoTitle, suggestNext } from "@/lib/generator";
+import { format, useLabels, useLocale, useMessages } from "@/lib/i18n";
 import { newItem, useAllPoses, useHydrated, usePoseMap, useStore } from "@/lib/store";
 import { sectionsFromSteps, TEMPLATES, type Template } from "@/lib/templates";
-import {
-  LEVEL_LABELS,
-  STYLE_LABELS,
-  type ClassPlan,
-  type ClassStyle,
-  type Level,
-  type Pose,
-  type Section,
-  type SequenceItem,
-} from "@/lib/types";
+import type { ClassPlan, ClassStyle, Level, Pose, Section, SequenceItem } from "@/lib/types";
 
-const AUTO_TITLE = /^(Vinyasa|Power|Hatha|Yoga doux|Yin|Restauratif) \d+ min$/;
+const M = {
+  fr: {
+    notFound: "Cours introuvable", backToClasses: "Retour à mes cours", undo: "Annuler", undoHint: "Annuler (⌘Z)", redo: "Rétablir",
+    redoHint: "Rétablir (⇧⌘Z)", newClass: "Nouveau cours", start: "Lancer", startClass: "Lancer le cours", listView: "Vue liste",
+    cardView: "Vue cartes", analysis: "Analyse", moreActions: "Plus d'actions", yes: "Oui", no: "Non", sanskritNames: "Noms sanskrits",
+    generate: "Générer un cours…", templates: "Cours prêts à l'emploi…", selectAll: "Tout sélectionner", print: "Imprimer / PDF",
+    duplicateClass: "Dupliquer le cours", shortcuts: "Raccourcis clavier", confirmDelete: "Supprimer « {title} » ?", thisClass: "ce cours",
+    deleteClass: "Supprimer le cours", addPoses: "Ajouter des postures", library: "Bibliothèque de postures", titlePlaceholder: "Titre du cours",
+    intentionPlaceholder: "Intention ou description du cours…", intention: "Intention", style: "Style", level: "Niveau",
+    targetDuration: "Durée visée", poses: "{n} posture(s)", hideNotes: "Masquer les notes", themeNotes: "Thème & notes",
+    themePlaceholder: "Thème (ex. Ancrage, Ouverture du cœur…)", notesPlaceholder: "Notes (accessoires, musique, élèves à surveiller…)",
+    sectionName: "Nom de la section", addsHere: "Les ajouts arrivent ici", sectionOptions: "Options de {title}",
+    selectSection: "Sélectionner la section", saveAsSequence: "Enregistrer en enchaînement", moveUp: "Monter", moveDown: "Descendre",
+    sectionDeleted: "Section « {title} » supprimée", deleteSection: "Supprimer la section",
+    emptySection: "Section vide : glisse une posture ici ou", addSection: "Ajouter une section", posesButton: "Postures",
+    defaultSection: "Séquence", newSection: "Nouvelle section",
+    poseAdded: "{name} ajoutée", itemsAdded: "« {label} » ajouté ({n} postures)", copied: "{n} posture(s) copiée(s)",
+    cut: "{n} coupée(s)", pasted: "{n} collée(s)", duplicated: "{n} dupliquée(s)", removed: "{n} retirée(s)",
+    poseRemoved: "{name} retirée", aPoseRemoved: "Posture retirée", pose: "Posture",
+    mySequence: "Mon enchaînement", sequenceName: "Nom de l'enchaînement", sequenceSaved: "Enchaînement « {title} » enregistré",
+    confirmReplace: "Remplacer la séquence actuelle ?", classLoaded: "Cours chargé",
+    keys: {
+      undoRedo: "Annuler / rétablir", selectAll: "Tout sélectionner", shiftClick: "Maj + clic", range: "Sélectionner une plage",
+      clipboard: "Copier / couper / coller", duplicate: "Dupliquer la sélection", del: "Suppr", remove: "Retirer la sélection",
+      esc: "Échap", clear: "Tout désélectionner",
+    },
+    empty: {
+      eyebrow: "Nouveau cours", heading: "Comment veux-tu commencer ?", generate: "Générer",
+      generateText: "Style, niveau, durée : la séquence complète est construite pour toi.", template: "Cours prêt à l'emploi",
+      templateText: "Un modèle équilibré, chargé en un clic.", compose: "Composer moi-même",
+      composeText: "Postures et enchaînements depuis la bibliothèque.", popular: "Populaires :",
+    },
+  },
+  en: {
+    notFound: "Class not found", backToClasses: "Back to my classes", undo: "Undo", undoHint: "Undo (⌘Z)", redo: "Redo",
+    redoHint: "Redo (⇧⌘Z)", newClass: "New class", start: "Start", startClass: "Start the class", listView: "List view",
+    cardView: "Card view", analysis: "Analysis", moreActions: "More actions", yes: "On", no: "Off", sanskritNames: "Sanskrit names",
+    generate: "Generate a class…", templates: "Ready-made classes…", selectAll: "Select all", print: "Print / PDF",
+    duplicateClass: "Duplicate class", shortcuts: "Keyboard shortcuts", confirmDelete: "Delete “{title}”?", thisClass: "this class",
+    deleteClass: "Delete class", addPoses: "Add poses", library: "Pose library", titlePlaceholder: "Class title",
+    intentionPlaceholder: "Intention or class description…", intention: "Intention", style: "Style", level: "Level",
+    targetDuration: "Target duration", poses: "{n} pose(s)", hideNotes: "Hide notes", themeNotes: "Theme & notes",
+    themePlaceholder: "Theme (e.g. Grounding, Heart opening…)", notesPlaceholder: "Notes (props, music, students to watch…)",
+    sectionName: "Section name", addsHere: "New poses go here", sectionOptions: "{title} options",
+    selectSection: "Select section", saveAsSequence: "Save as sequence", moveUp: "Move up", moveDown: "Move down",
+    sectionDeleted: "Section “{title}” deleted", deleteSection: "Delete section",
+    emptySection: "Empty section: drag a pose here or", addSection: "Add a section", posesButton: "Poses",
+    defaultSection: "Sequence", newSection: "New section",
+    poseAdded: "{name} added", itemsAdded: "“{label}” added ({n} poses)", copied: "{n} pose(s) copied",
+    cut: "{n} cut", pasted: "{n} pasted", duplicated: "{n} duplicated", removed: "{n} removed",
+    poseRemoved: "{name} removed", aPoseRemoved: "Pose removed", pose: "Pose",
+    mySequence: "My sequence", sequenceName: "Sequence name", sequenceSaved: "Sequence “{title}” saved",
+    confirmReplace: "Replace the current sequence?", classLoaded: "Class loaded",
+    keys: {
+      undoRedo: "Undo / redo", selectAll: "Select all", shiftClick: "Shift + click", range: "Select a range",
+      clipboard: "Copy / cut / paste", duplicate: "Duplicate selection", del: "Delete", remove: "Remove selection",
+      esc: "Esc", clear: "Deselect all",
+    },
+    empty: {
+      eyebrow: "New class", heading: "How would you like to start?", generate: "Generate",
+      generateText: "Style, level, duration: the full sequence is built for you.", template: "Ready-made class",
+      templateText: "A balanced template, loaded in one click.", compose: "Build it myself",
+      composeText: "Poses and sequences from the library.", popular: "Popular:",
+    },
+  },
+  es: {
+    notFound: "Clase no encontrada", backToClasses: "Volver a mis clases", undo: "Deshacer", undoHint: "Deshacer (⌘Z)", redo: "Rehacer",
+    redoHint: "Rehacer (⇧⌘Z)", newClass: "Nueva clase", start: "Empezar", startClass: "Empezar la clase", listView: "Vista de lista",
+    cardView: "Vista de tarjetas", analysis: "Análisis", moreActions: "Más acciones", yes: "Sí", no: "No", sanskritNames: "Nombres en sánscrito",
+    generate: "Generar una clase…", templates: "Clases listas para usar…", selectAll: "Seleccionar todo", print: "Imprimir / PDF",
+    duplicateClass: "Duplicar la clase", shortcuts: "Atajos de teclado", confirmDelete: "¿Eliminar «{title}»?", thisClass: "esta clase",
+    deleteClass: "Eliminar la clase", addPoses: "Añadir posturas", library: "Biblioteca de posturas", titlePlaceholder: "Título de la clase",
+    intentionPlaceholder: "Intención o descripción de la clase…", intention: "Intención", style: "Estilo", level: "Nivel",
+    targetDuration: "Duración prevista", poses: "{n} postura(s)", hideNotes: "Ocultar las notas", themeNotes: "Tema y notas",
+    themePlaceholder: "Tema (p. ej. Enraizamiento, Apertura del corazón…)", notesPlaceholder: "Notas (accesorios, música, alumnos a vigilar…)",
+    sectionName: "Nombre de la sección", addsHere: "Lo añadido llega aquí", sectionOptions: "Opciones de {title}",
+    selectSection: "Seleccionar la sección", saveAsSequence: "Guardar como secuencia", moveUp: "Subir", moveDown: "Bajar",
+    sectionDeleted: "Sección «{title}» eliminada", deleteSection: "Eliminar la sección",
+    emptySection: "Sección vacía: arrastra una postura aquí o", addSection: "Añadir una sección", posesButton: "Posturas",
+    defaultSection: "Secuencia", newSection: "Nueva sección",
+    poseAdded: "{name} añadida", itemsAdded: "«{label}» añadido ({n} posturas)", copied: "{n} postura(s) copiada(s)",
+    cut: "{n} cortada(s)", pasted: "{n} pegada(s)", duplicated: "{n} duplicada(s)", removed: "{n} quitada(s)",
+    poseRemoved: "{name} quitada", aPoseRemoved: "Postura quitada", pose: "Postura",
+    mySequence: "Mi secuencia", sequenceName: "Nombre de la secuencia", sequenceSaved: "Secuencia «{title}» guardada",
+    confirmReplace: "¿Reemplazar la secuencia actual?", classLoaded: "Clase cargada",
+    keys: {
+      undoRedo: "Deshacer / rehacer", selectAll: "Seleccionar todo", shiftClick: "Mayús + clic", range: "Seleccionar un rango",
+      clipboard: "Copiar / cortar / pegar", duplicate: "Duplicar la selección", del: "Supr", remove: "Quitar la selección",
+      esc: "Esc", clear: "Deseleccionar todo",
+    },
+    empty: {
+      eyebrow: "Nueva clase", heading: "¿Cómo quieres empezar?", generate: "Generar",
+      generateText: "Estilo, nivel, duración: la secuencia completa se construye para ti.", template: "Clase lista para usar",
+      templateText: "Una plantilla equilibrada, cargada en un clic.", compose: "Crearla yo",
+      composeText: "Posturas y secuencias desde la biblioteca.", popular: "Populares:",
+    },
+  },
+};
+
+const plural = (template: string, n: number) => format(template.replace(/\((\w+)\)/g, n > 1 ? "$1" : ""), { n });
+
 const uid = () => crypto.randomUUID();
 type Panel = "postures" | "analyse";
 
 export default function FlowBuilderPage() {
   const { id } = useParams<{ id: string }>();
   const hydrated = useHydrated();
+  const m = useMessages(M);
   const plan = useStore((s) => s.plans.find((p) => p.id === id));
   if (!hydrated) return null;
   if (!plan)
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
-        <p className="font-display text-2xl">Cours introuvable</p>
+        <p className="font-display text-2xl">{m.notFound}</p>
         <Link href="/" className="btn-primary mt-4">
-          Retour à mes cours
+          {m.backToClasses}
         </Link>
       </div>
     );
@@ -102,6 +195,9 @@ function isTyping(target: EventTarget | null) {
 
 function Builder({ plan }: { plan: ClassPlan }) {
   const router = useRouter();
+  const m = useMessages(M);
+  const L = useLabels();
+  const locale = useLocale();
   const updatePlan = useStore((s) => s.updatePlan);
   const deletePlan = useStore((s) => s.deletePlan);
   const duplicatePlan = useStore((s) => s.duplicatePlan);
@@ -159,7 +255,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
     [lastPose, poses, plan.level, flat, suggestSeed],
   );
 
-  // ----- Écriture avec historique (lecture de l'état courant du store pour rester juste dans les callbacks différés)
+  // ----- Writes with history (reads the store's current state to stay correct in deferred callbacks)
   const current = () => useStore.getState().plans.find((p) => p.id === plan.id)?.sections ?? [];
   const write = (next: Section[]) => updatePlan(plan.id, { sections: next });
   const syncHist = () => setHist({ canUndo: history.current.past.length > 0, canRedo: history.current.future.length > 0 });
@@ -183,17 +279,17 @@ function Builder({ plan }: { plan: ClassPlan }) {
     write(next);
     syncHist();
   };
-  const undoAction = { label: "Annuler", run: undo };
+  const undoAction = { label: m.undo, run: undo };
 
   const patch = (p: Partial<Omit<ClassPlan, "id">>) => updatePlan(plan.id, p);
   const mapItems = (secs: Section[], fn: (it: SequenceItem) => SequenceItem) =>
     secs.map((s) => ({ ...s, items: s.items.map(fn) }));
   const inOrder = (ids: Set<string>) => current().flatMap((s) => s.items).filter((it) => ids.has(it.id));
 
-  /** Insère après un élément, sinon à la fin de la section active. */
+  /** Inserts after an item, else at the end of the active section. */
   const insert = (items: SequenceItem[], afterId?: string | null) => {
     const secs = current();
-    if (!secs.length) return commit([{ id: uid(), title: "Séquence", items }]);
+    if (!secs.length) return commit([{ id: uid(), title: m.defaultSection, items }]);
     const host = afterId ? secs.find((s) => s.items.some((it) => it.id === afterId)) : undefined;
     const target = host ?? secs.find((s) => s.id === activeId) ?? secs[secs.length - 1];
     commit(
@@ -210,11 +306,11 @@ function Builder({ plan }: { plan: ClassPlan }) {
 
   const addPose = (pose: Pose) => {
     insert([newItem(pose)]);
-    show(`${pose.nameFr} ajoutée`, undoAction);
+    show(format(m.poseAdded, { name: pose.name }), undoAction);
   };
   const addItems = (items: SequenceItem[], label: string) => {
     insert(items);
-    show(`« ${label} » ajouté (${items.length} postures)`, undoAction);
+    show(format(m.itemsAdded, { label, n: items.length }), undoAction);
   };
 
   const updateItem = (id: string, p: Partial<SequenceItem>) => {
@@ -256,29 +352,29 @@ function Builder({ plan }: { plan: ClassPlan }) {
   const copySel = () => {
     const items = inOrder(selected);
     setClipboard(items);
-    show(`${items.length} posture${items.length > 1 ? "s" : ""} copiée${items.length > 1 ? "s" : ""}`);
+    show(plural(m.copied, items.length));
   };
   const cutSel = () => {
     const items = inOrder(selected);
     setClipboard(items);
-    removeIds(new Set(items.map((it) => it.id)), `${items.length} coupée${items.length > 1 ? "s" : ""}`);
+    removeIds(new Set(items.map((it) => it.id)), plural(m.cut, items.length));
   };
   const paste = () => {
     if (!clipboard.length) return;
     insert(clone(clipboard), lastSelectedId());
-    show(`${clipboard.length} collée${clipboard.length > 1 ? "s" : ""}`, undoAction);
+    show(plural(m.pasted, clipboard.length), undoAction);
   };
   const duplicateSel = () => {
     const items = inOrder(selected);
     insert(clone(items), items.at(-1)?.id);
-    show(`${items.length} dupliquée${items.length > 1 ? "s" : ""}`, undoAction);
+    show(plural(m.duplicated, items.length), undoAction);
   };
-  const saveSel = (items = inOrder(selected), fallback = "Mon enchaînement") => {
+  const saveSel = (items = inOrder(selected), fallback = m.mySequence) => {
     if (!items.length) return;
-    const title = prompt("Nom de l'enchaînement", fallback)?.trim();
+    const title = prompt(m.sequenceName, fallback)?.trim();
     if (!title) return;
     saveSequence(title, items);
-    show(`Enchaînement « ${title} » enregistré`);
+    show(format(m.sequenceSaved, { title }));
   };
   const bulk = (p: Partial<SequenceItem>) => commit(mapItems(current(), (it) => (selected.has(it.id) ? { ...it, ...p } : it)));
 
@@ -326,8 +422,8 @@ function Builder({ plan }: { plan: ClassPlan }) {
 
   // ----- Remplacement complet (générateur, modèles)
   const replaceSections = (next: Pick<ClassPlan, "sections"> & Partial<ClassPlan>) => {
-    if (count > 0 && !confirm("Remplacer la séquence actuelle ?")) return;
-    const autoTitle = !plan.title || TEMPLATES.some((t) => t.title === plan.title) || AUTO_TITLE.test(plan.title);
+    if (count > 0 && !confirm(m.confirmReplace)) return;
+    const autoTitle = !plan.title || isAutoTitle(plan.title);
     history.current.past.push(current());
     history.current.future = [];
     syncHist();
@@ -335,19 +431,19 @@ function Builder({ plan }: { plan: ClassPlan }) {
     clearSelection();
     setActiveSection(null);
     setDialog(null);
-    show("Cours chargé", undoAction);
+    show(m.classLoaded, undoAction);
   };
   const isSided = (pid: string) => poseMap.get(pid)?.sided ?? false;
   const loadTemplate = (t: Template) =>
     replaceSections({
-      sections: sectionsFromSteps(t.sections, isSided),
-      title: t.title,
+      sections: sectionsFromSteps(t.sections, isSided, locale),
+      title: t.title[locale],
       style: t.style,
       level: t.level,
       targetMinutes: t.targetMinutes,
-      theme: plan.theme || t.theme,
+      theme: plan.theme || t.theme[locale],
     });
-  const templateDuration = (t: Template) => planSeconds({ sections: sectionsFromSteps(t.sections, isSided) } as ClassPlan);
+  const templateDuration = (t: Template) => planSeconds({ sections: sectionsFromSteps(t.sections, isSided, locale) } as ClassPlan);
 
   // ----- Panneaux
   const openPanel = (p: Panel) => {
@@ -362,7 +458,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
         onPick={addPose}
         onAddItems={addItems}
         suggestions={suggestions}
-        suggestFor={lastPose?.nameFr ?? null}
+        suggestFor={lastPose?.name ?? null}
         onRefreshSuggestions={() => setSuggestSeed((n) => n + 1)}
         onClose={close}
         footer={
@@ -405,7 +501,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
         duplicateSel();
       } else if ((e.key === "Backspace" || e.key === "Delete") && selected.size) {
         e.preventDefault();
-        removeIds(new Set(selected), `${selected.size} retirée${selected.size > 1 ? "s" : ""}`);
+        removeIds(new Set(selected), plural(m.removed, selected.size));
       } else if (e.key === "Escape") {
         clearSelection();
         setExpanded(null);
@@ -427,52 +523,52 @@ function Builder({ plan }: { plan: ClassPlan }) {
       {/* Barre d'outils */}
       <div className="no-print sticky top-14 z-20 border-b border-line/70 bg-background/85 backdrop-blur-xl">
         <div className="flex h-14 items-center gap-1 px-2 sm:px-4">
-          <Link href="/" className="icon-btn" aria-label="Retour à mes cours">
+          <Link href="/" className="icon-btn" aria-label={m.backToClasses}>
             <ChevronLeft size={20} />
           </Link>
-          <button className="icon-btn" onClick={undo} disabled={!hist.canUndo} aria-label="Annuler" title="Annuler (⌘Z)">
+          <button className="icon-btn" onClick={undo} disabled={!hist.canUndo} aria-label={m.undo} title={m.undoHint}>
             <Undo2 size={18} />
           </button>
-          <button className="icon-btn" onClick={redo} disabled={!hist.canRedo} aria-label="Rétablir" title="Rétablir (⇧⌘Z)">
+          <button className="icon-btn" onClick={redo} disabled={!hist.canRedo} aria-label={m.redo} title={m.redoHint}>
             <Redo2 size={18} />
           </button>
           <div className="mx-auto flex min-w-0 items-center gap-2 px-2">
-            <span className="hidden truncate font-semibold sm:block">{plan.title || "Nouveau cours"}</span>
+            <span className="hidden truncate font-semibold sm:block">{plan.title || m.newClass}</span>
             <Link
               href={`/cours/${plan.id}/jouer`}
-              aria-label="Lancer le cours"
-              title="Lancer le cours"
+              aria-label={m.startClass}
+              title={m.startClass}
               className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-accent pr-3.5 pl-3 text-sm font-bold text-surface shadow-soft transition hover:bg-accent-strong ${
                 count ? "" : "pointer-events-none opacity-40"
               }`}
             >
-              <Play size={15} fill="currentColor" /> Lancer
+              <Play size={15} fill="currentColor" /> {m.start}
             </Link>
           </div>
           <div className="hidden rounded-full bg-surface-2 p-0.5 sm:flex">
-            <button className="icon-btn h-8 w-8" data-active={prefs.view === "liste"} onClick={() => setPrefs({ view: "liste" })} aria-label="Vue liste">
+            <button className="icon-btn h-8 w-8" data-active={prefs.view === "liste"} onClick={() => setPrefs({ view: "liste" })} aria-label={m.listView}>
               <List size={17} />
             </button>
-            <button className="icon-btn h-8 w-8" data-active={prefs.view === "cartes"} onClick={() => setPrefs({ view: "cartes" })} aria-label="Vue cartes">
+            <button className="icon-btn h-8 w-8" data-active={prefs.view === "cartes"} onClick={() => setPrefs({ view: "cartes" })} aria-label={m.cardView}>
               <LayoutGrid size={17} />
             </button>
           </div>
-          <button className="icon-btn" data-active={panel === "analyse" || mobilePanel === "analyse"} onClick={() => openPanel("analyse")} aria-label="Analyse" title="Analyse">
+          <button className="icon-btn" data-active={panel === "analyse" || mobilePanel === "analyse"} onClick={() => openPanel("analyse")} aria-label={m.analysis} title={m.analysis}>
             <BarChart3 size={18} />
           </button>
           <Popover
             align="end"
             className="w-64"
             trigger={({ open, toggle }) => (
-              <button className="icon-btn" data-active={open} onClick={toggle} aria-label="Plus d'actions">
+              <button className="icon-btn" data-active={open} onClick={toggle} aria-label={m.moreActions}>
                 <Ellipsis size={18} />
               </button>
             )}
           >
             {(close) => (
               <div role="menu">
-                <MenuItem icon={<Languages size={15} />} onClick={() => setPrefs({ showSanskrit: !prefs.showSanskrit })} hint={prefs.showSanskrit ? "Oui" : "Non"}>
-                  Noms sanskrits
+                <MenuItem icon={<Languages size={15} />} onClick={() => setPrefs({ showSanskrit: !prefs.showSanskrit })} hint={prefs.showSanskrit ? m.yes : m.no}>
+                  {m.sanskritNames}
                 </MenuItem>
                 <MenuItem
                   icon={prefs.view === "liste" ? <LayoutGrid size={15} /> : <List size={15} />}
@@ -481,20 +577,20 @@ function Builder({ plan }: { plan: ClassPlan }) {
                     close();
                   }}
                 >
-                  {prefs.view === "liste" ? "Vue cartes" : "Vue liste"}
+                  {prefs.view === "liste" ? m.cardView : m.listView}
                 </MenuItem>
                 <div className="my-1 h-px bg-line" />
                 <MenuItem icon={<Sparkles size={15} />} onClick={() => (close(), setDialog("generate"))}>
-                  Générer un cours…
+                  {m.generate}
                 </MenuItem>
                 <MenuItem icon={<LayoutTemplate size={15} />} onClick={() => (close(), setDialog("templates"))}>
-                  Cours prêts à l&apos;emploi…
+                  {m.templates}
                 </MenuItem>
                 <MenuItem icon={<ListChecks size={15} />} onClick={() => (close(), setSelected(new Set(flat.map((it) => it.id))))} hint="⌘A">
-                  Tout sélectionner
+                  {m.selectAll}
                 </MenuItem>
                 <MenuItem icon={<Printer size={15} />} onClick={() => router.push(`/cours/${plan.id}/imprimer`)}>
-                  Imprimer / PDF
+                  {m.print}
                 </MenuItem>
                 <MenuItem
                   icon={<CopyPlus size={15} />}
@@ -503,22 +599,22 @@ function Builder({ plan }: { plan: ClassPlan }) {
                     if (copy) router.push(`/cours/${copy}`);
                   }}
                 >
-                  Dupliquer le cours
+                  {m.duplicateClass}
                 </MenuItem>
                 <MenuItem icon={<Keyboard size={15} />} onClick={() => (close(), setDialog("shortcuts"))}>
-                  Raccourcis clavier
+                  {m.shortcuts}
                 </MenuItem>
                 <div className="my-1 h-px bg-line" />
                 <MenuItem
                   danger
                   icon={<Trash2 size={15} />}
                   onClick={() => {
-                    if (!confirm(`Supprimer « ${plan.title || "ce cours"} » ?`)) return;
+                    if (!confirm(format(m.confirmDelete, { title: plan.title || m.thisClass }))) return;
                     deletePlan(plan.id);
                     router.push("/");
                   }}
                 >
-                  Supprimer le cours
+                  {m.deleteClass}
                 </MenuItem>
               </div>
             )}
@@ -527,8 +623,8 @@ function Builder({ plan }: { plan: ClassPlan }) {
             className="icon-btn bg-accent-soft text-accent hover:bg-accent hover:text-surface"
             data-active={panel === "postures" || mobilePanel === "postures"}
             onClick={() => openPanel("postures")}
-            aria-label="Ajouter des postures"
-            title="Bibliothèque de postures"
+            aria-label={m.addPoses}
+            title={m.library}
           >
             <Plus size={20} />
           </button>
@@ -541,15 +637,15 @@ function Builder({ plan }: { plan: ClassPlan }) {
           <div className="mx-auto max-w-5xl">
             <input
               className="w-full bg-transparent font-display text-3xl font-semibold tracking-tight outline-none placeholder:text-muted/40 sm:text-4xl"
-              placeholder="Titre du cours"
+              placeholder={m.titlePlaceholder}
               value={plan.title}
               onChange={(e) => patch({ title: e.target.value })}
-              aria-label="Titre du cours"
+              aria-label={m.titlePlaceholder}
             />
             <textarea
               className="mt-1 w-full resize-none bg-transparent text-muted outline-none placeholder:text-muted/50"
               rows={1}
-              placeholder="Intention ou description du cours…"
+              placeholder={m.intentionPlaceholder}
               value={plan.intention}
               onChange={(e) => patch({ intention: e.target.value })}
               onInput={(e) => {
@@ -557,24 +653,24 @@ function Builder({ plan }: { plan: ClassPlan }) {
                 t.style.height = "auto";
                 t.style.height = `${t.scrollHeight}px`;
               }}
-              aria-label="Intention"
+              aria-label={m.intention}
             />
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <label className="pill cursor-pointer">
-                <select className="cursor-pointer bg-transparent outline-none" value={plan.style} onChange={(e) => patch({ style: e.target.value as ClassStyle })} aria-label="Style">
-                  {(Object.keys(STYLE_LABELS) as ClassStyle[]).map((s) => (
+                <select className="cursor-pointer bg-transparent outline-none" value={plan.style} onChange={(e) => patch({ style: e.target.value as ClassStyle })} aria-label={m.style}>
+                  {(Object.keys(L.style) as ClassStyle[]).map((s) => (
                     <option key={s} value={s}>
-                      {STYLE_LABELS[s]}
+                      {L.style[s]}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="pill cursor-pointer">
-                <select className="cursor-pointer bg-transparent outline-none" value={plan.level} onChange={(e) => patch({ level: e.target.value as Level })} aria-label="Niveau">
-                  {(Object.keys(LEVEL_LABELS) as Level[]).map((l) => (
+                <select className="cursor-pointer bg-transparent outline-none" value={plan.level} onChange={(e) => patch({ level: e.target.value as Level })} aria-label={m.level}>
+                  {(Object.keys(L.level) as Level[]).map((l) => (
                     <option key={l} value={l}>
-                      {LEVEL_LABELS[l]}
+                      {L.level[l]}
                     </option>
                   ))}
                 </select>
@@ -592,7 +688,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
                   className="cursor-pointer bg-transparent text-muted outline-none"
                   value={plan.targetMinutes}
                   onChange={(e) => patch({ targetMinutes: Number(e.target.value) })}
-                  aria-label="Durée visée"
+                  aria-label={m.targetDuration}
                 >
                   {DURATIONS.map((d) => (
                     <option key={d} value={d}>
@@ -602,19 +698,19 @@ function Builder({ plan }: { plan: ClassPlan }) {
                 </select>
               </div>
               <span className="text-xs font-semibold text-muted">
-                {count} posture{count > 1 ? "s" : ""}
+                {plural(m.poses, count)}
               </span>
               <button className="ml-auto text-xs font-semibold text-muted hover:text-foreground" onClick={() => setShowDetails((v) => !v)}>
-                {showDetails ? "Masquer les notes" : "Thème & notes"}
+                {showDetails ? m.hideNotes : m.themeNotes}
               </button>
             </div>
             {showDetails && (
               <div className="mt-3 grid animate-fade gap-2 sm:grid-cols-2">
-                <input className="input" placeholder="Thème (ex. Ancrage, Ouverture du cœur…)" value={plan.theme} onChange={(e) => patch({ theme: e.target.value })} />
+                <input className="input" placeholder={m.themePlaceholder} value={plan.theme} onChange={(e) => patch({ theme: e.target.value })} />
                 <textarea
                   className="input"
                   rows={2}
-                  placeholder="Notes (accessoires, musique, élèves à surveiller…)"
+                  placeholder={m.notesPlaceholder}
                   value={plan.notes}
                   onChange={(e) => patch({ notes: e.target.value })}
                 />
@@ -652,9 +748,9 @@ function Builder({ plan }: { plan: ClassPlan }) {
                             className="min-w-0 flex-1 bg-transparent font-display text-xl font-semibold outline-none"
                             value={section.title}
                             onChange={(e) => write(current().map((s) => (s.id === section.id ? { ...s, title: e.target.value } : s)))}
-                            aria-label="Nom de la section"
+                            aria-label={m.sectionName}
                           />
-                          {active && <span className="hidden rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent sm:inline">Les ajouts arrivent ici</span>}
+                          {active && <span className="hidden rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-bold text-accent sm:inline">{m.addsHere}</span>}
                           <span className="text-xs font-semibold whitespace-nowrap text-muted">
                             {section.items.length} · {formatDuration(sectionSeconds(section))}
                           </span>
@@ -662,7 +758,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
                             align="end"
                             className="w-60"
                             trigger={({ open, toggle }) => (
-                              <button className="icon-btn h-8 w-8" data-active={open} onClick={toggle} aria-label={`Options de ${section.title}`}>
+                              <button className="icon-btn h-8 w-8" data-active={open} onClick={toggle} aria-label={format(m.sectionOptions, { title: section.title })}>
                                 <Ellipsis size={16} />
                               </button>
                             )}
@@ -670,22 +766,22 @@ function Builder({ plan }: { plan: ClassPlan }) {
                             {(close) => (
                               <div role="menu">
                                 <MenuItem icon={<ListChecks size={15} />} onClick={() => (close(), setSelected(new Set(section.items.map((it) => it.id))))}>
-                                  Sélectionner la section
+                                  {m.selectSection}
                                 </MenuItem>
                                 <MenuItem icon={<BookmarkPlus size={15} />} onClick={() => (close(), saveSel(section.items, section.title))}>
-                                  Enregistrer en enchaînement
+                                  {m.saveAsSequence}
                                 </MenuItem>
                                 <MenuItem
                                   icon={<ArrowUp size={15} />}
                                   onClick={() => (close(), index > 0 && commit(arrayMove(current(), index, index - 1)))}
                                 >
-                                  Monter
+                                  {m.moveUp}
                                 </MenuItem>
                                 <MenuItem
                                   icon={<ArrowDown size={15} />}
                                   onClick={() => (close(), index < sections.length - 1 && commit(arrayMove(current(), index, index + 1)))}
                                 >
-                                  Descendre
+                                  {m.moveDown}
                                 </MenuItem>
                                 <MenuItem
                                   danger
@@ -693,10 +789,10 @@ function Builder({ plan }: { plan: ClassPlan }) {
                                   onClick={() => {
                                     close();
                                     commit(current().filter((s) => s.id !== section.id));
-                                    show(`Section « ${section.title} » supprimée`, undoAction);
+                                    show(format(m.sectionDeleted, { title: section.title }), undoAction);
                                   }}
                                 >
-                                  Supprimer la section
+                                  {m.deleteSection}
                                 </MenuItem>
                               </div>
                             )}
@@ -727,13 +823,13 @@ function Builder({ plan }: { plan: ClassPlan }) {
                                 onCheck: (shift: boolean) => check(item.id, shift),
                                 onToggleExpand: () => setExpanded(expanded === item.id ? null : item.id),
                                 onChange: (p: Partial<SequenceItem>) => updateItem(item.id, p),
-                                onRemove: () => removeIds(new Set([item.id]), `${poseMap.get(item.poseId)?.nameFr ?? "Posture"} retirée`),
+                                onRemove: () => removeIds(new Set([item.id]), format(m.poseRemoved, { name: poseMap.get(item.poseId)?.name ?? m.pose })),
                                 editor: (
                                   <ItemEditor
                                     item={item}
                                     pose={poseMap.get(item.poseId)}
                                     onChange={(p) => updateItem(item.id, p)}
-                                    onRemove={() => removeIds(new Set([item.id]), "Posture retirée")}
+                                    onRemove={() => removeIds(new Set([item.id]), m.aPoseRemoved)}
                                     onDuplicate={() => insert(clone([item]), item.id)}
                                   />
                                 ),
@@ -742,7 +838,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
                             })}
                             {section.items.length === 0 && (
                               <li className="col-span-full flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line p-5 text-center text-sm text-muted">
-                                Section vide : glisse une posture ici ou
+                                {m.emptySection}
                                 <button
                                   className="btn py-1.5"
                                   onClick={(e) => {
@@ -751,7 +847,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
                                     openPanel("postures");
                                   }}
                                 >
-                                  <Plus size={14} /> Ajouter des postures
+                                  <Plus size={14} /> {m.addPoses}
                                 </button>
                               </li>
                             )}
@@ -766,7 +862,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
                                   item={it}
                                   pose={poseMap.get(it.poseId)}
                                   onChange={(p) => updateItem(it.id, p)}
-                                  onRemove={() => removeIds(new Set([it.id]), "Posture retirée")}
+                                  onRemove={() => removeIds(new Set([it.id]), m.aPoseRemoved)}
                                   onDuplicate={() => insert(clone([it]), it.id)}
                                 />
                               );
@@ -784,12 +880,12 @@ function Builder({ plan }: { plan: ClassPlan }) {
               <button
                 className="btn mt-6"
                 onClick={() => {
-                  const sec: Section = { id: uid(), title: "Nouvelle section", items: [] };
+                  const sec: Section = { id: uid(), title: m.newSection, items: [] };
                   commit([...current(), sec]);
                   setActiveSection(sec.id);
                 }}
               >
-                <Plus size={15} /> Ajouter une section
+                <Plus size={15} /> {m.addSection}
               </button>
             )}
           </div>
@@ -814,7 +910,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
           className={`btn-primary fixed right-4 bottom-5 z-30 py-3 pr-5 pl-4 text-base shadow-lift ${panel === "postures" ? "lg:hidden" : ""}`}
           onClick={() => openPanel("postures")}
         >
-          <Library size={18} /> Postures
+          <Library size={18} /> {m.posesButton}
         </button>
       )}
 
@@ -828,7 +924,7 @@ function Builder({ plan }: { plan: ClassPlan }) {
           onPaste={paste}
           onDuplicate={duplicateSel}
           onSave={() => saveSel()}
-          onDelete={() => removeIds(new Set(selected), `${selected.size} retirée${selected.size > 1 ? "s" : ""}`)}
+          onDelete={() => removeIds(new Set(selected), plural(m.removed, selected.size))}
           onHold={(h) => bulk(h)}
           onSide={(side) => bulk({ side })}
           onBreath={(breath) => bulk({ breath })}
@@ -847,23 +943,23 @@ function Builder({ plan }: { plan: ClassPlan }) {
           initial={{ style: plan.style, level: plan.level, targetMinutes: plan.targetMinutes }}
           onClose={() => setDialog(null)}
           onGenerate={(opts) => {
-            const generated = generatePlan(opts, poses);
+            const generated = generatePlan(opts, poses, locale);
             replaceSections({ ...generated, style: opts.style, level: opts.level, targetMinutes: opts.targetMinutes });
           }}
         />
       )}
       {dialog === "templates" && <TemplatesDialog onClose={() => setDialog(null)} onPick={loadTemplate} durationOf={templateDuration} />}
       {dialog === "shortcuts" && (
-        <Modal title="Raccourcis clavier" icon={<Keyboard size={20} />} onClose={() => setDialog(null)}>
+        <Modal title={m.shortcuts} icon={<Keyboard size={20} />} onClose={() => setDialog(null)}>
           <ul className="divide-y divide-line text-sm">
             {[
-              ["⌘ Z / ⇧ ⌘ Z", "Annuler / rétablir"],
-              ["⌘ A", "Tout sélectionner"],
-              ["Maj + clic", "Sélectionner une plage"],
-              ["⌘ C / ⌘ X / ⌘ V", "Copier / couper / coller"],
-              ["⌘ D", "Dupliquer la sélection"],
-              ["Suppr", "Retirer la sélection"],
-              ["Échap", "Tout désélectionner"],
+              ["⌘ Z / ⇧ ⌘ Z", m.keys.undoRedo],
+              ["⌘ A", m.keys.selectAll],
+              [m.keys.shiftClick, m.keys.range],
+              ["⌘ C / ⌘ X / ⌘ V", m.keys.clipboard],
+              ["⌘ D", m.keys.duplicate],
+              [m.keys.del, m.keys.remove],
+              [m.keys.esc, m.keys.clear],
             ].map(([k, v]) => (
               <li key={k} className="flex items-center justify-between py-2.5">
                 <span>{v}</span>
@@ -888,15 +984,17 @@ function EmptyState({
   onPick: () => void;
   onTemplate: (t: Template) => void;
 }) {
+  const m = useMessages(M).empty;
+  const locale = useLocale();
   const options = [
-    { icon: <Sparkles size={22} />, title: "Générer", text: "Style, niveau, durée : la séquence complète est construite pour toi.", onClick: onGenerate, tone: "bg-accent text-surface" },
-    { icon: <LayoutTemplate size={22} />, title: "Cours prêt à l'emploi", text: "Un modèle équilibré, chargé en un clic.", onClick: onTemplates, tone: "bg-lilac-soft text-lilac" },
-    { icon: <Library size={22} />, title: "Composer moi-même", text: "Postures et enchaînements depuis la bibliothèque.", onClick: onPick, tone: "bg-clay-soft text-clay" },
+    { icon: <Sparkles size={22} />, title: m.generate, text: m.generateText, onClick: onGenerate, tone: "bg-accent text-surface" },
+    { icon: <LayoutTemplate size={22} />, title: m.template, text: m.templateText, onClick: onTemplates, tone: "bg-lilac-soft text-lilac" },
+    { icon: <Library size={22} />, title: m.compose, text: m.composeText, onClick: onPick, tone: "bg-clay-soft text-clay" },
   ];
   return (
     <div className="mt-8 rounded-[2rem] border border-line bg-surface p-6 text-center shadow-soft sm:p-10">
-      <p className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase">Nouveau cours</p>
-      <h2 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">Comment veux-tu commencer ?</h2>
+      <p className="text-[11px] font-bold tracking-[0.2em] text-accent uppercase">{m.eyebrow}</p>
+      <h2 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">{m.heading}</h2>
       <div className="mt-7 grid gap-3 sm:grid-cols-3">
         {options.map((o) => (
           <button
@@ -911,10 +1009,10 @@ function EmptyState({
         ))}
       </div>
       <div className="mt-7 flex flex-wrap items-center justify-center gap-2 text-sm">
-        <span className="font-semibold text-muted">Populaires :</span>
+        <span className="font-semibold text-muted">{m.popular}</span>
         {TEMPLATES.map((t) => (
           <button key={t.id} className="chip" onClick={() => onTemplate(t)}>
-            {t.title}
+            {t.title[locale]}
           </button>
         ))}
       </div>

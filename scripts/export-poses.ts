@@ -5,7 +5,9 @@
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { FAMILIES } from "../src/lib/catalog/families";
-import { CATEGORY_LABELS, LEVEL_LABELS } from "../src/lib/types";
+import { LABELS } from "../src/lib/labels";
+
+const { category: CATEGORY_LABELS, level: LEVEL_LABELS } = LABELS.fr;
 
 const STYLE =
   "Flat vector illustration, original character: a young woman with light skin, dark brown hair in a ponytail, " +

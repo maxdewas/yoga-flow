@@ -1,5 +1,7 @@
 import type { Chakra } from "./details";
 import { itemSeconds } from "./duration";
+import type { AnalyticsZone } from "./labels";
+import type { Localized } from "./locale";
 import type { Category, ClassPlan, Level, Pose, SequenceItem } from "./types";
 
 /**
@@ -29,30 +31,11 @@ export function poseIntensity(pose: Pose | undefined): number {
   return Math.min(5, Math.max(1, LEVEL_RANK[pose.level] + effort));
 }
 
-export type Zone =
-  | "epaules"
-  | "bras"
-  | "poitrine"
-  | "abdos"
-  | "dos"
-  | "hanches"
-  | "fessiers"
-  | "ischios"
-  | "cuisses"
-  | "mollets";
+/** Body areas of the analysis; labels live in `LABELS[locale].analyticsZone`. */
+export type Zone = AnalyticsZone;
 
-export const ZONE_LABELS: Record<Zone, string> = {
-  epaules: "Épaules",
-  bras: "Bras & poignets",
-  poitrine: "Poitrine",
-  abdos: "Abdominaux",
-  dos: "Dos",
-  hanches: "Hanches",
-  fessiers: "Fessiers",
-  ischios: "Ischio-jambiers",
-  cuisses: "Cuisses",
-  mollets: "Mollets & chevilles",
-};
+/** Every zone, in display order (front to back, top to bottom). */
+export const ZONES: Zone[] = ["epaules", "bras", "poitrine", "abdos", "dos", "hanches", "fessiers", "ischios", "cuisses", "mollets"];
 
 const CATEGORY_ZONES: Partial<Record<Category, Partial<Record<Zone, number>>>> = {
   debout: { cuisses: 1, fessiers: 0.6, mollets: 0.5 },
@@ -78,14 +61,11 @@ export const CHAKRA_COLORS: Record<Chakra, string> = {
   couronne: "#9a6cc7",
 };
 
-export const CHAKRA_SHORT: Record<Chakra, string> = {
-  racine: "Racine",
-  sacre: "Sacré",
-  plexus: "Plexus",
-  coeur: "Cœur",
-  gorge: "Gorge",
-  "troisieme-oeil": "3e œil",
-  couronne: "Couronne",
+/** Short chakra names for compact charts; full names are `LABELS[locale].chakra`. */
+export const CHAKRA_SHORT: Localized<Record<Chakra, string>> = {
+  fr: { racine: "Racine", sacre: "Sacré", plexus: "Plexus", coeur: "Cœur", gorge: "Gorge", "troisieme-oeil": "3e œil", couronne: "Couronne" },
+  en: { racine: "Root", sacre: "Sacral", plexus: "Plexus", coeur: "Heart", gorge: "Throat", "troisieme-oeil": "3rd eye", couronne: "Crown" },
+  es: { racine: "Raíz", sacre: "Sacro", plexus: "Plexo", coeur: "Corazón", gorge: "Garganta", "troisieme-oeil": "3.er ojo", couronne: "Corona" },
 };
 
 const THROAT_POSES = /^(chandelle|charrue|poisson|oreilles-pressees|pont|lion|demi-chandelle|embryon-chandelle)/;
@@ -129,12 +109,20 @@ export function flowEntries(plan: Pick<ClassPlan, "sections">, poseMap: Map<stri
   return out;
 }
 
-export interface Insight {
+/** A finding about the class; its wording belongs to the display (see AnalyticsPanel). */
+export type Insight = {
   tone: "ok" | "warn";
-  text: string;
   /** Postures concernées (ids d'éléments du cours), pour les surligner. */
   itemIds?: string[];
-}
+} & (
+  | { kind: "unmatched-sides"; pose: Pose; right: number; left: number }
+  | { kind: "above-level"; count: number }
+  | { kind: "intense-start" }
+  | { kind: "no-rest-end" }
+  | { kind: "over-target"; minutes: number }
+  | { kind: "under-target"; minutes: number }
+  | { kind: "balanced" }
+);
 
 export interface FlowAnalysis {
   count: number;
@@ -200,7 +188,7 @@ export function analyzeFlow(plan: Pick<ClassPlan, "sections" | "level" | "target
     for (const c of ch) chakraSeconds.set(c, (chakraSeconds.get(c) ?? 0) + e.seconds / ch.length);
   }
   const maxZone = Math.max(0, ...zoneScore.values());
-  const zones = (Object.keys(ZONE_LABELS) as Zone[])
+  const zones = ZONES
     .map((zone) => ({ zone, score: maxZone ? (zoneScore.get(zone) ?? 0) / maxZone : 0 }))
     .sort((a, b) => b.score - a.score);
   const categories = [...catSeconds.entries()]
@@ -213,28 +201,32 @@ export function analyzeFlow(plan: Pick<ClassPlan, "sections" | "level" | "target
     for (const u of unmatched)
       insights.push({
         tone: "warn",
-        text: `${u.pose.nameFr} : ${u.right} fois à droite, ${u.left} fois à gauche.`,
+        kind: "unmatched-sides",
+        pose: u.pose,
+        right: u.right,
+        left: u.left,
         itemIds: u.itemIds,
       });
     const tooHard = known.filter((e) => LEVEL_RANK[e.pose.level] > LEVEL_RANK[plan.level]);
     if (tooHard.length)
       insights.push({
         tone: "warn",
-        text: `${tooHard.length} posture${tooHard.length > 1 ? "s" : ""} au-dessus du niveau du cours.`,
+        kind: "above-level",
+        count: tooHard.length,
         itemIds: tooHard.map((e) => e.item.id),
       });
     const opening = curve.slice(0, 3);
     if (opening.length === 3 && opening.reduce((n, c) => n + c.intensity, 0) / 3 >= 3)
-      insights.push({ tone: "warn", text: "Le début est intense : prévois un échauffement plus doux.", itemIds: opening.map((c) => c.itemId) });
+      insights.push({ tone: "warn", kind: "intense-start", itemIds: opening.map((c) => c.itemId) });
     const last = known.at(-1);
     if (last && !last.pose.categories.includes("restauratrice") && last.pose.id !== "savasana")
-      insights.push({ tone: "warn", text: "Le cours ne se termine pas par une posture de repos (Savasana…)." });
+      insights.push({ tone: "warn", kind: "no-rest-end" });
     const target = plan.targetMinutes * 60;
     if (total > target * 1.1)
-      insights.push({ tone: "warn", text: `Le cours dépasse la durée visée de ${Math.round((total - target) / 60)} min.` });
+      insights.push({ tone: "warn", kind: "over-target", minutes: Math.round((total - target) / 60) });
     else if (total < target * 0.8)
-      insights.push({ tone: "warn", text: `Il manque environ ${Math.round((target - total) / 60)} min pour atteindre la durée visée.` });
-    if (!insights.length) insights.push({ tone: "ok", text: "Cours équilibré : côtés, niveau, début et fin sont cohérents." });
+      insights.push({ tone: "warn", kind: "under-target", minutes: Math.round((target - total) / 60) });
+    if (!insights.length) insights.push({ tone: "ok", kind: "balanced" });
   }
 
   return { count: entries.length, total, avgLevel, peak, curve, levels, sides, unmatched, categories, zones, chakras, insights };
