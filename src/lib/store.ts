@@ -60,6 +60,16 @@ export interface Prefs {
     secondsPerBreath: number;
     keepAwake: boolean;
   };
+  print: PrintPrefs;
+}
+
+/** Choices of the print page: a landscape grid of pose cards, or the portrait list. */
+export interface PrintPrefs {
+  layout: "grille" | "liste";
+  /** Poses per landscape page. */
+  perPage: number;
+  images: boolean;
+  cues: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -79,6 +89,7 @@ export const DEFAULT_PREFS: Prefs = {
     secondsPerBreath: 5,
     keepAwake: true,
   },
+  print: { layout: "grille", perPage: 8, images: true, cues: true },
 };
 
 /** What the teacher changed on a pose (built-in or custom); applied over the catalog, never written into it. */
@@ -119,7 +130,12 @@ interface State {
   resetPoseEdit: (poseId: string) => void;
   saveSequence: (title: string, items: SequenceItem[]) => string;
   deleteSequence: (id: string) => void;
-  setPrefs: (patch: Partial<Omit<Prefs, "player">> & { player?: Partial<Prefs["player"]> }) => void;
+  setPrefs: (
+    patch: Partial<Omit<Prefs, "player" | "print">> & {
+      player?: Partial<Prefs["player"]>;
+      print?: Partial<PrintPrefs>;
+    },
+  ) => void;
   restore: (backup: Backup) => void;
 }
 
@@ -185,7 +201,14 @@ export const useStore = create<State>()(
       },
       deleteSequence: (id) => set((s) => ({ sequences: s.sequences.filter((q) => q.id !== id) })),
       setPrefs: (patch) =>
-        set((s) => ({ prefs: { ...s.prefs, ...patch, player: { ...s.prefs.player, ...patch.player } } })),
+        set((s) => ({
+          prefs: {
+            ...s.prefs,
+            ...patch,
+            player: { ...s.prefs.player, ...patch.player },
+            print: { ...s.prefs.print, ...patch.print },
+          },
+        })),
       restore: (backup) =>
         set({
           plans: backup.plans.map((p) => ({ ...p, style: p.style ?? "vinyasa", targetMinutes: p.targetMinutes ?? 60 })),
@@ -217,7 +240,12 @@ export const useStore = create<State>()(
         return {
           ...current,
           ...p,
-          prefs: { ...DEFAULT_PREFS, ...p.prefs, player: { ...DEFAULT_PREFS.player, ...p.prefs?.player } },
+          prefs: {
+            ...DEFAULT_PREFS,
+            ...p.prefs,
+            player: { ...DEFAULT_PREFS.player, ...p.prefs?.player },
+            print: { ...DEFAULT_PREFS.print, ...p.prefs?.print },
+          },
         };
       },
     },

@@ -311,3 +311,20 @@ body {
     --shadow: none;
   }
 }
+
+/* Print sheets: the printed palette on screen too (also in dark mode), and backgrounds kept when printing. */
+.paper {
+  --background: #ffffff;
+  --surface: #ffffff;
+  --foreground: #000000;
+  --muted: #555555;
+  --line: #cccccc;
+  --accent: #3f5c42;
+  --accent-soft: #eef3ec;
+  --thumb: #f8f4f0;
+  --fig-bg: #f8f4f0;
+  background: #ffffff;
+  color: #000000;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
